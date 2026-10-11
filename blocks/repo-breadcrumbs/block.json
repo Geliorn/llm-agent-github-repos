@@ -1,0 +1,11 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "lagr/repo-breadcrumbs",
+	"title": "GitHub-репозиторий: хлебные крошки",
+	"category": "widgets",
+	"description": "Навигационная цепочка Каталог → тема → репозиторий для страницы записи.",
+	"supports": { "html": false },
+	"render": "file:./render.php",
+	"editorScript": "file:./index.js"
+}

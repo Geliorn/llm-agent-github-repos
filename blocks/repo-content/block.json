@@ -1,0 +1,12 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "lagr/repo-content",
+	"title": "GitHub-репозиторий: описание и README (вкладки)",
+	"category": "widgets",
+	"description": "Текстовые разделы записи во вкладках — сгенерированное описание, README из GitHub и «Установка» с командой клонирования.",
+	"supports": { "html": false },
+	"render": "file:./render.php",
+	"editorScript": "file:./index.js",
+	"viewScript": "file:./view.js"
+}

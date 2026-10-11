@@ -1,0 +1,610 @@
+/* GitHub Repo Collector — visual polish for the plugin's block patterns.
+ * Deliberately minimal: everything NOT listed here (typography, accent
+ * color, backgrounds, spacing scale) is left to the active theme's
+ * theme.json. Only the handful of semantic colors we decided to keep
+ * fixed across every site in the network live here (topic pill blue,
+ * heart rating red) — see docs/stack-decisions.md.
+ */
+
+.lagr-card {
+	border: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+	border-radius: 6px;
+	padding: 16px;
+}
+
+.lagr-avatar img {
+	border-radius: 5px;
+}
+
+/* Card ratings are a plain score display (voting only happens on the repo's
+ * own single page) — drop the pointer cursor/hover affordance the
+ * interactive stars use, so a card doesn't look clickable when it isn't. */
+.lagr-rating-readonly .lagr-rating-star {
+	cursor: default;
+}
+
+.lagr-topic-pill a {
+	background: #ddf4ff;
+	color: #0969da;
+	font-weight: 500;
+	border-radius: 999px;
+	padding: 2px 9px;
+	margin: 0 8px 6px 0;
+	text-decoration: none;
+	display: inline-block;
+}
+
+.lagr-tag-pill a {
+	background: color-mix(in srgb, currentColor 8%, transparent);
+	border-radius: 999px;
+	padding: 2px 9px;
+	margin: 0 8px 6px 0;
+	text-decoration: none;
+	display: inline-block;
+}
+
+/* The clamped tag/topic rows (.lagr-tag-pill-clamped, 2-3 lines max) set
+ * overflow:hidden to cut off extra lines. The browser's default focus/hover
+ * ring draws OUTSIDE the link's border box, so it got sliced by that
+ * overflow — outline-offset:-2px (tried first) didn't reliably pull it
+ * inside on every browser/line position. An inset box-shadow is drawn
+ * INSIDE the border box by definition, so it physically cannot be clipped
+ * by an ancestor's overflow:hidden no matter where the pill sits. */
+.lagr-topic-pill a:hover,
+.lagr-topic-pill a:focus-visible,
+.lagr-tag-pill a:hover,
+.lagr-tag-pill a:focus-visible {
+	outline: none;
+	box-shadow: inset 0 0 0 2px currentColor;
+}
+
+/* Real GitHub repos often carry 15-20 topics — shown in full on the single
+ * page, but on a card grid that many tag pills wraps across 5-6 lines and
+ * is exactly what made the homepage feel sprawling/unreadable. Cap the
+ * card's tag row to ~2 lines; the rest are still one click away. */
+/* -webkit-line-clamp (not max-height) — a fixed pixel height rarely divides
+ * evenly by the pills' actual rendered row height (padding + wrap gaps), so
+ * max-height sliced pills mid-row instead of cutting at a clean line
+ * boundary — visible live, looked broken rather than "trimmed". line-clamp
+ * clips at the real line box, whatever its height turns out to be. */
+.lagr-tag-pill-clamped {
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	min-height: 60px; /* reserve 2 lines even when a repo has few tags — same drift problem as title/desc above, measured live at 60.28px for a full 2-line row */
+}
+
+/* Repo names/descriptions vary a lot in length — without a reserved height,
+ * a 1-line title/description next to a 2-line one in the same grid row
+ * pushes everything below (rating, stats, button) to a different vertical
+ * position per card. Found live: the rating row visibly "drifted" between
+ * cards in the same row of the homepage tile grid. Reserve 2 lines' worth
+ * of space unconditionally so the rating/stats/button stack lines up. */
+.lagr-card .wp-block-post-title {
+	min-height: 2.6em;
+	line-height: 1.3;
+}
+
+/* Same problem on the single page's header — even with the full page to work
+ * with, 15-20 raw tag pills wrapping under the title/owner row reads as
+ * broken, not "detailed". Give it more room than a card (3 lines) but still
+ * cap it; the full list is one click away via the term archive. */
+.lagr-tag-pill-clamped-lg {
+	display: -webkit-box;
+	-webkit-line-clamp: 3;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+/* Same reasoning for the description — GitHub's own description field can
+ * run to 200+ characters, which alone can dwarf the rest of a card. */
+.lagr-card-desc {
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	min-height: 2.6em; /* reserve the same 2 lines even when shorter — see .lagr-card .wp-block-post-title above */
+}
+
+/* repo_language/repo_license post-terms otherwise inherit the theme's
+ * default link style (blue, underlined) — visually clashing with the calm
+ * neutral pill system used for topics/tags right next to them. Found live:
+ * a stray underlined blue "TypeScript" sitting between the ★/⑂ icon-stats
+ * read like a rendering error, not an intentional link. */
+.lagr-plain-term a {
+	color: inherit;
+	text-decoration: none;
+	font-weight: 500;
+}
+.lagr-plain-term a:hover {
+	text-decoration: underline;
+}
+
+.lagr-card-stats {
+	border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+	padding-top: 8px;
+	margin-top: 4px;
+	column-gap: 14px;
+}
+
+/* icon_stat()'s "★ 203K" pairing — a small fixed gap instead of the
+ * theme's global 1.25rem blockGap, which read as the icon and number
+ * drifting apart into two unrelated pieces of text. */
+.lagr-icon-stat {
+	gap: 4px;
+}
+.lagr-icon-stat p {
+	font-variant-numeric: tabular-nums;
+}
+
+/* Own rating widget (lagr/rating) — replaces WP-PostRatings, same ♡ red
+ * used across the mockups. */
+.lagr-rating {
+	/* NOT inline-flex: this sits as a direct top-level child in the single
+	 * page's layout, centered by the theme's "constrained" content-width
+	 * CSS via margin-left/right:auto — auto margins don't center an
+	 * inline-level box, only a block-level one. inline-flex made the whole
+	 * widget hug the left edge instead of aligning with its siblings
+	 * (found live: it sat at the page's root padding, ~90px left of every
+	 * other element on the page). display:flex is still just as shrink-to-
+	 * fit/content-sized as inline-flex was — only the outer box type changes. */
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.lagr-rating-stars {
+	display: inline-flex;
+	gap: 2px;
+}
+.lagr-rating-star {
+	background: none;
+	border: none;
+	padding: 0;
+	font-size: 15px;
+	line-height: 1;
+	color: #c0392b;
+	cursor: pointer;
+}
+.lagr-rating-large .lagr-rating-star {
+	font-size: 26px;
+}
+.lagr-rating-star:disabled {
+	cursor: default;
+	opacity: 0.85;
+}
+.lagr-rating-voted .lagr-rating-star {
+	/* Filled hearts for a vote already cast — same glyph, visually "on". */
+	text-shadow: 0 0 0 currentColor;
+}
+.lagr-rating-score {
+	font-size: 12.5px;
+	color: color-mix(in srgb, currentColor 55%, transparent);
+}
+.lagr-rating-score b {
+	color: inherit;
+	font-variant-numeric: tabular-nums;
+}
+.lagr-rating-large .lagr-rating-score {
+	font-size: 14px;
+}
+
+/* Own related-posts block (lagr/related-posts) — replaces Contextual
+ * Related Posts' unstyled default <ul><li> output. */
+.lagr-related {
+	display: grid;
+	grid-template-columns: repeat( auto-fit, minmax( 200px, 1fr ) );
+	gap: 12px;
+}
+.lagr-related-card {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 12px;
+	border: 1px solid color-mix( in srgb, currentColor 15%, transparent );
+	border-radius: 6px;
+	text-decoration: none;
+	color: inherit;
+}
+.lagr-related-title {
+	font-size: 13.5px;
+	font-weight: 600;
+}
+.lagr-related-rating {
+	font-size: 11px;
+	color: color-mix( in srgb, currentColor 55%, transparent );
+}
+.lagr-related-rating b {
+	color: inherit;
+	font-variant-numeric: tabular-nums;
+}
+
+/* A subtle full-width band under the hero, like the mockup's gradient —
+ * color-mix keeps it theme-portable instead of a fixed accent hex, per the
+ * earlier "no hardcoded structural colors" decision (docs/stack-decisions.md). */
+.lagr-hero {
+	background: color-mix(in srgb, currentColor 5%, transparent);
+	border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+	padding-top: 3rem;
+	padding-bottom: 2rem;
+}
+
+/* Same fix as .lagr-plain-term, applied to the "Темы и теги" cloud block —
+ * core/tag-cloud's default link color/underline clashed with the neutral
+ * pill palette used everywhere else on the site. */
+.lagr-topic-tag-cloud a {
+	color: inherit;
+	text-decoration: none;
+}
+.lagr-topic-tag-cloud a:hover {
+	text-decoration: underline;
+}
+
+.lagr-hero-topics a {
+	background: color-mix(in srgb, currentColor 8%, transparent);
+	border-radius: 999px;
+	padding: 4px 11px;
+	margin: 0 6px 6px;
+	text-decoration: none;
+	display: inline-block;
+	font-size: 13px;
+}
+
+/* lagr/repo-filters — own archive filter form (replaces Filter Everything,
+ * see class-lagr-filters.php). Plain GET form, no JS framework, so the
+ * styling only needs to cover native form elements. */
+.lagr-filters {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+.lagr-filter-group {
+	border: none;
+	padding: 0;
+	margin: 0;
+}
+.lagr-filter-group legend,
+.lagr-filter-select-label {
+	font-size: 12px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: color-mix(in srgb, currentColor 65%, transparent);
+	margin-bottom: 8px;
+	padding: 0;
+}
+.lagr-filter-select-label {
+	display: block;
+}
+/* Large facets (post_tag etc. — see render.php's $collapse_threshold) as a
+ * native multi-select listbox instead of a 100+ item checkbox wall. */
+.lagr-filter-multiselect {
+	width: 100%;
+	padding: 4px;
+	border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+	border-radius: 5px;
+	background: transparent;
+	color: inherit;
+	font-size: 13px;
+}
+.lagr-filter-multiselect option {
+	padding: 3px 6px;
+	border-radius: 3px;
+}
+.lagr-filter-option {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 0;
+	cursor: pointer;
+	line-height: 1.3;
+}
+.lagr-filter-option input {
+	flex: none;
+}
+.lagr-filter-count {
+	color: color-mix(in srgb, currentColor 45%, transparent);
+	font-size: 11.5px;
+	margin-left: auto;
+	padding-left: 8px;
+}
+.lagr-filter-select {
+	width: 100%;
+	padding: 6px 8px;
+	border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+	border-radius: 5px;
+	background: transparent;
+	color: inherit;
+	font-size: 13px;
+}
+.lagr-filter-apply {
+	background: var(--wp--preset--color--accent, #2f5d4f);
+	color: var(--wp--preset--color--base, #fff);
+	border: none;
+	border-radius: 999px;
+	padding: 8px 16px;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+}
+.lagr-filter-reset {
+	display: inline-block;
+	text-align: center;
+	font-size: 12.5px;
+	text-decoration: underline;
+	color: inherit;
+	margin-top: 4px;
+}
+
+/* Single repo page — hero card (identity + description + topics + rating +
+ * CTAs) above two columns (README/description tabs | "О репозитории" facts
+ * card). Replaces the old flat stack of header / rating / stats rows that
+ * read as "everything mixed together". */
+.lagr-single-hero {
+	border: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+	border-radius: 10px;
+	padding: 24px;
+}
+.lagr-single-id {
+	align-items: center;
+	gap: 14px;
+}
+.lagr-single-avatar {
+	margin: 0;
+	flex: none;
+}
+.lagr-single-avatar img {
+	border-radius: 8px;
+}
+.lagr-single-id .wp-block-post-title {
+	margin: 0;
+	font-size: 1.6rem;
+	line-height: 1.2;
+}
+.lagr-single-id > .wp-block-group p {
+	margin: 2px 0 0;
+	color: color-mix(in srgb, currentColor 55%, transparent);
+}
+.lagr-single-desc {
+	margin: 16px 0 12px;
+}
+.lagr-single-bar {
+	align-items: center;
+	gap: 14px 20px;
+	margin-top: 18px;
+	padding-top: 18px;
+	border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+.lagr-single-cta.wp-block-buttons {
+	gap: 10px;
+	margin: 0;
+}
+/* Repos without a homepage bind an empty URL into "Сайт проекта" — hide that
+ * button rather than leave a dead link. */
+.lagr-single-cta .wp-block-button:has(> a[href=""]),
+.lagr-single-cta .wp-block-button:has(> a[href="#"]) {
+	display: none;
+}
+
+.lagr-single-about {
+	border: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+	border-radius: 10px;
+	padding: 18px 20px;
+}
+.lagr-single-about h3 {
+	margin: 0 0 10px;
+	font-size: 1.05rem;
+}
+.lagr-about-row {
+	align-items: baseline;
+	gap: 12px;
+	padding: 7px 0;
+	border-bottom: 1px solid color-mix(in srgb, currentColor 8%, transparent);
+	flex-wrap: nowrap;
+}
+.lagr-about-row:last-of-type {
+	border-bottom: none;
+}
+.lagr-about-label {
+	margin: 0;
+	flex: none;
+	color: color-mix(in srgb, currentColor 55%, transparent);
+}
+.lagr-about-row > :last-child {
+	margin: 0;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+.lagr-about-row .wp-block-post-terms a {
+	text-decoration: none;
+	color: inherit;
+	font-weight: 500;
+}
+.lagr-single-about h4 {
+	margin: 16px 0 8px;
+	font-size: 0.72rem;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: color-mix(in srgb, currentColor 55%, transparent);
+}
+
+/* Breadcrumbs (lagr/repo-breadcrumbs) at the top of the repo page. */
+.lagr-breadcrumbs {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 16px;
+	font-size: 0.8125rem;
+	color: color-mix(in srgb, currentColor 55%, transparent);
+}
+.lagr-breadcrumbs a {
+	color: inherit;
+	text-decoration: none;
+}
+.lagr-breadcrumbs a:hover {
+	color: var(--wp--preset--color--accent, #2f5d4f);
+	text-decoration: underline;
+}
+.lagr-breadcrumbs [aria-current="page"] {
+	color: var(--wp--preset--color--contrast, #1c1c1a);
+}
+.lagr-breadcrumbs-sep {
+	opacity: 0.5;
+}
+
+/* "Установка" tab — clone command + copy button. */
+.lagr-install-hint {
+	margin: 0 0 8px;
+	font-size: 0.875rem;
+	color: color-mix(in srgb, currentColor 60%, transparent);
+}
+.lagr-install-cmd {
+	display: flex;
+	align-items: stretch;
+	border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+	border-radius: 8px;
+	overflow: hidden;
+	background: var(--wp--preset--color--base-2, #f7f7f5);
+}
+.lagr-install-cmd code {
+	flex: 1;
+	align-self: center;
+	padding: 10px 14px;
+	font-size: 0.875rem;
+	white-space: nowrap;
+	overflow-x: auto;
+}
+.lagr-copy {
+	flex: none;
+	border: none;
+	border-left: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+	background: var(--wp--preset--color--base, #fff);
+	color: var(--wp--preset--color--accent, #2f5d4f);
+	font-weight: 600;
+	font-size: 0.8125rem;
+	padding: 0 16px;
+	cursor: pointer;
+	white-space: nowrap;
+}
+.lagr-copy:hover,
+.lagr-copy.is-copied {
+	background: var(--wp--preset--color--accent, #2f5d4f);
+	color: var(--wp--preset--color--base, #fff);
+}
+
+/* Related repos — a clearly separated section at the bottom of the page. */
+.lagr-related-section h3 {
+	margin-top: 0;
+}
+
+/* core/query-pagination renders as plain underlined text by default in
+ * Twenty Twenty-Five — the mockup used bordered pill buttons per page
+ * number. Restyle to match without touching the block markup itself. */
+.wp-block-query-pagination {
+	gap: 6px;
+	align-items: center;
+}
+.wp-block-query-pagination-numbers {
+	display: inline-flex;
+	gap: 6px;
+}
+.wp-block-query-pagination a,
+.wp-block-query-pagination-numbers > * {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 2.2em;
+	height: 2.2em;
+	padding: 0 0.6em;
+	border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+	border-radius: 5px;
+	text-decoration: none !important;
+}
+/* NOT color-mix(...currentColor...) here: this rule also sets `color`, and
+ * currentColor in `background` resolves against THIS element's own `color` —
+ * so mixing against currentColor while also setting color:base produced
+ * white text on a near-white background (invisible "1", found live). */
+.wp-block-query-pagination-numbers .current {
+	background: var(--wp--preset--color--contrast, #111);
+	color: var(--wp--preset--color--base, #fff);
+	border-color: transparent;
+	font-weight: 600;
+}
+.wp-block-query-pagination-previous-arrow,
+.wp-block-query-pagination-next-arrow {
+	margin: 0 0.3em;
+}
+
+/* lagr/repo-content — the single page's generated description and GitHub README
+ * as two tabs. CSS-only: hidden radio inputs precede the nav and panels as
+ * siblings, so `:checked ~` shows the matching label state and panel with no
+ * JavaScript. Degrades to stacked sections if this stylesheet fails to load. */
+.lagr-tabs {
+	margin-top: 4px;
+}
+.lagr-tabin {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	opacity: 0;
+	pointer-events: none;
+}
+.lagr-tabnav {
+	display: flex;
+	gap: 4px;
+	border-bottom: 1px solid var(--wp--preset--color--light, #e3e2dd);
+	margin-bottom: 18px;
+}
+.lagr-tab {
+	cursor: pointer;
+	padding: 8px 16px;
+	font-weight: 600;
+	font-size: 14px;
+	color: color-mix(in srgb, currentColor 55%, transparent);
+	border-bottom: 2px solid transparent;
+	margin-bottom: -1px;
+	white-space: nowrap;
+}
+.lagr-tab:hover {
+	color: var(--wp--preset--color--accent, #2f5d4f);
+}
+.lagr-tabpanel {
+	display: none;
+}
+.lagr-tabpanel.is-single {
+	display: block;
+}
+.lagr-tabin-desc:checked ~ .lagr-tabnav .lagr-tab-desc,
+.lagr-tabin-readme:checked ~ .lagr-tabnav .lagr-tab-readme,
+.lagr-tabin-install:checked ~ .lagr-tabnav .lagr-tab-install {
+	color: var(--wp--preset--color--accent, #2f5d4f);
+	border-bottom-color: var(--wp--preset--color--accent, #2f5d4f);
+}
+.lagr-tabin-desc:checked ~ .lagr-panel-desc,
+.lagr-tabin-readme:checked ~ .lagr-panel-readme,
+.lagr-tabin-install:checked ~ .lagr-panel-install {
+	display: block;
+}
+/* Keyboard focus ring on the label of whichever radio is focused. */
+.lagr-tabin-desc:focus-visible ~ .lagr-tabnav .lagr-tab-desc,
+.lagr-tabin-readme:focus-visible ~ .lagr-tabnav .lagr-tab-readme,
+.lagr-tabin-install:focus-visible ~ .lagr-tabnav .lagr-tab-install {
+	outline: 2px solid var(--wp--preset--color--accent, #2f5d4f);
+	outline-offset: 2px;
+	border-radius: 3px;
+}
+.lagr-tab-empty {
+	color: color-mix(in srgb, currentColor 55%, transparent);
+	font-style: italic;
+}
+.lagr-repo-content-title {
+	margin-top: 0;
+}
+.lagr-tabpanel pre {
+	overflow-x: auto;
+}
+.lagr-tabpanel img {
+	max-width: 100%;
+	height: auto;
+}
