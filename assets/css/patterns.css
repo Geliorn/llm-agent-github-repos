@@ -24,8 +24,11 @@
 }
 
 .lagr-topic-pill a {
-	background: #ddf4ff;
-	color: #0969da;
+	/* Follow the active style variation's palette (soft accent fill + accent
+	 * text) so topic pills stay on-palette across all light/dark variations;
+	 * the GitHub-blue literals are just a fallback if the tokens are missing. */
+	background: var(--wp--preset--color--accent-2, #ddf4ff);
+	color: var(--wp--preset--color--accent, #0969da);
 	font-weight: 500;
 	border-radius: 999px;
 	padding: 2px 9px;
