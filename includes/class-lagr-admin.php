@@ -256,7 +256,7 @@ class LAGR_Admin {
 					<tr><th>Включить LLM</th><td><label><input type="checkbox" name="llm_enabled" value="1" <?php checked( $s['llm_enabled'] ); ?>> без этого используется description репозитория + README как есть</label></td></tr>
 					<tr><th>Провайдер</th><td>
 						<select name="llm_provider">
-							<?php foreach ( array( 'yandex' => 'Yandex Foundation Models', 'deepseek' => 'DeepSeek напрямую', 'timeweb' => 'Timeweb (TWC AI API)', 'openrouter' => 'OpenRouter' ) as $val => $label ) : ?>
+							<?php foreach ( array( 'yandex' => 'Yandex Foundation Models', 'deepseek' => 'DeepSeek напрямую', 'qwen' => 'Qwen (Alibaba DashScope)', 'timeweb' => 'Timeweb (TWC AI API)', 'openrouter' => 'OpenRouter' ) as $val => $label ) : ?>
 								<option value="<?php echo esc_attr( $val ); ?>" <?php selected( $s['llm_provider'], $val ); ?>><?php echo esc_html( $label ); ?></option>
 							<?php endforeach; ?>
 						</select>
@@ -274,6 +274,13 @@ class LAGR_Admin {
 				<table class="form-table">
 					<tr><th>API Key</th><td><input type="password" name="deepseek_api_key" value="<?php echo esc_attr( $s['deepseek_api_key'] ); ?>" style="width:400px"></td></tr>
 					<tr><th>Модель</th><td><input type="text" name="deepseek_model" value="<?php echo esc_attr( $s['deepseek_model'] ); ?>" style="width:400px"></td></tr>
+				</table>
+
+				<h3>Qwen (Alibaba DashScope)</h3>
+				<table class="form-table">
+					<tr><th>API Key</th><td><input type="password" name="qwen_api_key" value="<?php echo esc_attr( $s['qwen_api_key'] ); ?>" style="width:400px"></td></tr>
+					<tr><th>Модель</th><td><input type="text" name="qwen_model" value="<?php echo esc_attr( $s['qwen_model'] ); ?>" style="width:400px"> <span class="description">напр. qwen-plus, qwen-max, qwen-turbo</span></td></tr>
+					<tr><th>Base URL</th><td><input type="text" name="qwen_base_url" value="<?php echo esc_attr( $s['qwen_base_url'] ); ?>" style="width:400px"> <span class="description">compatible-mode: междунар. <code>https://dashscope-intl.aliyuncs.com/compatible-mode/v1</code> или КНР <code>https://dashscope.aliyuncs.com/compatible-mode/v1</code></span></td></tr>
 				</table>
 
 				<h3>Timeweb (TWC AI API)</h3>
@@ -351,6 +358,7 @@ class LAGR_Admin {
 			'yandex_api_key', 'yandex_folder_id', 'yandex_model',
 			'translate_engine', 'translate_target_lang', 'translate_source_lang',
 			'deepseek_api_key', 'deepseek_model',
+			'qwen_api_key', 'qwen_model', 'qwen_base_url',
 			'timeweb_agent_id', 'timeweb_token', 'timeweb_proxy_source',
 			'openrouter_api_key', 'openrouter_model',
 			'extra_topics_taxonomy', 'seo_plugin',

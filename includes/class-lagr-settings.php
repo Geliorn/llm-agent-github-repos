@@ -42,6 +42,11 @@ class LAGR_Settings {
 			'translate_source_lang' => '', // '' = autodetect.
 			'deepseek_api_key'      => '',
 			'deepseek_model'        => 'deepseek-chat',
+			// Qwen (Alibaba DashScope, OpenAI-compatible mode). Base URL is
+			// configurable so you can switch the international / mainland host.
+			'qwen_api_key'          => '',
+			'qwen_model'            => 'qwen-plus',
+			'qwen_base_url'         => 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
 			'timeweb_agent_id'      => '',
 			'timeweb_token'         => '',
 			'timeweb_proxy_source'  => '',
@@ -147,6 +152,14 @@ class LAGR_Settings {
 						'Authorization' => 'Bearer ' . $s['openrouter_api_key'],
 					),
 					'model'    => $s['openrouter_model'],
+				);
+			case 'qwen':
+				return array(
+					'endpoint' => rtrim( $s['qwen_base_url'], '/' ) . '/chat/completions',
+					'headers'  => array(
+						'Authorization' => 'Bearer ' . $s['qwen_api_key'],
+					),
+					'model'    => $s['qwen_model'],
 				);
 			case 'deepseek':
 			default:

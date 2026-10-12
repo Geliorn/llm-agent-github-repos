@@ -58,6 +58,8 @@ class LAGR_Translate {
 					&& '' !== (string) LAGR_Settings::get( 'timeweb_agent_id' );
 			case 'openrouter':
 				return '' !== (string) LAGR_Settings::get( 'openrouter_api_key' );
+			case 'qwen':
+				return '' !== (string) LAGR_Settings::get( 'qwen_api_key' );
 			case 'deepseek':
 			default:
 				return '' !== (string) LAGR_Settings::get( 'deepseek_api_key' );
