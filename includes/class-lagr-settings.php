@@ -32,9 +32,12 @@ class LAGR_Settings {
 			'yandex_api_key'        => '',
 			'yandex_folder_id'      => '',
 			'yandex_model'          => 'deepseek-v32/latest',
-			// README translation via Yandex Cloud Translate (reuses the Yandex
-			// API Key / Folder ID above). Off by default — it's billed per char.
+			// README translation. Off by default. Engine: 'llm' (a separate
+			// request to the configured chat provider — default, works while
+			// Yandex Translate is down) or 'yandex' (Yandex Cloud Translate,
+			// reuses the Yandex API Key / Folder ID above).
 			'translate_readme'      => 0,
+			'translate_engine'      => 'llm',
 			'translate_target_lang' => 'ru',
 			'translate_source_lang' => '', // '' = autodetect.
 			'deepseek_api_key'      => '',

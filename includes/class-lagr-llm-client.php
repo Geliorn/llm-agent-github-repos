@@ -31,6 +31,95 @@ class LAGR_LLM_Client {
 — Язык: русский
 PROMPT;
 
+	/** Separate prompt for README translation (keeps the HTML, translates only prose). %s = target language. */
+	const TRANSLATE_SYSTEM_PROMPT = <<<PROMPT
+Ты — переводчик технической документации (README) с сохранением HTML-разметки.
+Переведи присланный HTML-фрагмент на язык: %s.
+
+Правила:
+— Сохраняй ВСЕ HTML-теги, атрибуты и структуру без изменений.
+— НЕ переводи и не изменяй содержимое внутри <code> и <pre>, а также команды, пути, имена пакетов и функций, URL, флаги, названия продуктов и идентификаторы кода.
+— Переводи только естественный текст: абзацы, заголовки, подписи, пункты списков, ячейки таблиц, осмысленные alt/title.
+— Не добавляй и не убирай содержимое, не оборачивай ответ в markdown-блок.
+— Верни ТОЛЬКО переведённый HTML, без каких-либо пояснений до или после.
+PROMPT;
+
+	/**
+	 * Translate a README HTML fragment via the configured chat/completions
+	 * provider — a separate request with a dedicated translation prompt, used
+	 * when the translation engine is "llm" (e.g. while Yandex Translate is down).
+	 * HTML is split on block boundaries so each request stays within output
+	 * limits. Returns '' on any failure (caller keeps the original).
+	 *
+	 * @param string $html        HTML to translate.
+	 * @param string $target_lang Target language code (default 'ru').
+	 * @param string $source_lang Unused for the LLM path (autodetected by the model).
+	 */
+	public function translate_html( $html, $target_lang = 'ru', $source_lang = '' ) {
+		$html = (string) $html;
+		if ( '' === trim( $html ) ) {
+			return '';
+		}
+
+		$provider = LAGR_Settings::get( 'llm_provider', 'deepseek' );
+		$config   = LAGR_Settings::llm_provider_config( $provider );
+		$system   = sprintf( self::TRANSLATE_SYSTEM_PROMPT, $this->lang_name( $target_lang ) );
+
+		$out = '';
+		foreach ( LAGR_Translate::chunk_html( $html, 3500 ) as $chunk ) {
+			$payload = array(
+				'model'       => $config['model'],
+				'max_tokens'  => 4096,
+				'temperature' => 0.2,
+				'messages'    => array(
+					array(
+						'role'    => 'system',
+						'content' => $system,
+					),
+					array(
+						'role'    => 'user',
+						'content' => $chunk,
+					),
+				),
+			);
+
+			$content = $this->call( $config, $payload, 1 );
+			if ( ! $content ) {
+				LAGR_Log::add( 'Перевод README (LLM): пустой/ошибочный ответ от провайдера ' . $provider );
+				return '';
+			}
+			$out .= $this->strip_code_fence( $content );
+		}
+
+		return $out;
+	}
+
+	/** Target-language code → human name for the prompt. */
+	private function lang_name( $code ) {
+		$map  = array(
+			'ru' => 'русский',
+			'en' => 'английский',
+			'de' => 'немецкий',
+			'fr' => 'французский',
+			'es' => 'испанский',
+			'zh' => 'китайский',
+			'uk' => 'украинский',
+		);
+		$code = strtolower( trim( (string) $code ) );
+		return $map[ $code ] ?? ( $code ? $code : 'русский' );
+	}
+
+	/** Models sometimes wrap output in ```html fences despite instructions — strip them. */
+	private function strip_code_fence( $s ) {
+		$s = trim( $s );
+		if ( 0 === strpos( $s, '```' ) ) {
+			$s = preg_replace( '/^```[a-zA-Z]*\n?/', '', $s );
+			$s = preg_replace( '/\n?```$/', '', $s );
+			$s = trim( $s );
+		}
+		return $s;
+	}
+
 	public function generate_descriptions( array $repo ) {
 		$provider = LAGR_Settings::get( 'llm_provider', 'deepseek' );
 		$config   = LAGR_Settings::llm_provider_config( $provider );

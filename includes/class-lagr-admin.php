@@ -289,12 +289,22 @@ class LAGR_Admin {
 					<tr><th>Модель</th><td><input type="text" name="openrouter_model" value="<?php echo esc_attr( $s['openrouter_model'] ); ?>" style="width:400px"> <span class="description">например deepseek/deepseek-chat</span></td></tr>
 				</table>
 
-				<h2 style="margin-top:30px">Перевод README (Yandex Cloud Translate)</h2>
-				<p class="description" style="margin-bottom:10px">Переводит текст README на нужный язык через Yandex Cloud Translate, сохраняя разметку (ссылки, код, таблицы). Использует <strong>тот же API Key и Folder ID</strong>, что и провайдер «Yandex Foundation Models» выше — у сервис-аккаунта должна быть роль <code>translate.user</code>. Тарифицируется посимвольно. Существующие записи — командой <code>wp github-repos rebuild_readmes --translate</code>.</p>
+				<h2 style="margin-top:30px">Перевод README</h2>
+				<p class="description" style="margin-bottom:10px">Переводит текст README на нужный язык, сохраняя разметку (ссылки, код, таблицы). Два движка:<br>
+				&bull; <strong>Нейросеть (LLM)</strong> — отдельный запрос с промтом к выбранному провайдеру из раздела «Генерация описаний» выше (DeepSeek/Yandex/Timeweb/OpenRouter). Работает, даже когда Yandex Translate недоступен.<br>
+				&bull; <strong>Yandex Cloud Translate</strong> — использует тот же API Key и Folder ID, что провайдер «Yandex Foundation Models» (у сервис-аккаунта нужна роль <code>translate.user</code>), тарифицируется посимвольно.<br>
+				Существующие записи — командой <code>wp github-repos rebuild_readmes --translate</code>.</p>
 				<table class="form-table">
 					<tr><th>Переводить README</th><td><label><input type="checkbox" name="translate_readme" value="1" <?php checked( $s['translate_readme'] ); ?>> переводить README при сборе репозиториев</label></td></tr>
+					<tr><th>Движок перевода</th><td>
+						<select name="translate_engine">
+							<?php foreach ( array( 'llm' => 'Нейросеть (LLM-провайдер)', 'yandex' => 'Yandex Cloud Translate' ) as $val => $label ) : ?>
+								<option value="<?php echo esc_attr( $val ); ?>" <?php selected( $s['translate_engine'], $val ); ?>><?php echo esc_html( $label ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</td></tr>
 					<tr><th>Язык перевода</th><td><input type="text" name="translate_target_lang" value="<?php echo esc_attr( $s['translate_target_lang'] ); ?>" style="width:120px"> <span class="description">код языка, напр. <code>ru</code></span></td></tr>
-					<tr><th>Исходный язык</th><td><input type="text" name="translate_source_lang" value="<?php echo esc_attr( $s['translate_source_lang'] ); ?>" style="width:120px"> <span class="description">пусто — автоопределение</span></td></tr>
+					<tr><th>Исходный язык</th><td><input type="text" name="translate_source_lang" value="<?php echo esc_attr( $s['translate_source_lang'] ); ?>" style="width:120px"> <span class="description">пусто — автоопределение (для LLM — всегда авто)</span></td></tr>
 				</table>
 
 				<?php submit_button( 'Сохранить настройки' ); ?>
@@ -339,7 +349,7 @@ class LAGR_Admin {
 		$text_fields = array(
 			'github_token', 'gh_budget_threshold', 'score_forks_weight', 'llm_provider',
 			'yandex_api_key', 'yandex_folder_id', 'yandex_model',
-			'translate_target_lang', 'translate_source_lang',
+			'translate_engine', 'translate_target_lang', 'translate_source_lang',
 			'deepseek_api_key', 'deepseek_model',
 			'timeweb_agent_id', 'timeweb_token', 'timeweb_proxy_source',
 			'openrouter_api_key', 'openrouter_model',

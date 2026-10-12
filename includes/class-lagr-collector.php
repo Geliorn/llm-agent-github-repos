@@ -154,6 +154,7 @@ class LAGR_Collector {
 		// translation kept in a sibling meta.
 		$readme_html    = self::build_readme_html( $client, $full_name, $readme );
 		$readme_html_tr = LAGR_Translate::enabled() ? LAGR_Translate::translate_html( $readme_html ) : '';
+		$readme_html_tr = '' !== $readme_html_tr ? self::sanitize_readme_html( $readme_html_tr ) : '';
 
 		$generated_by_llm = false;
 		$generated_html   = '';
@@ -367,8 +368,8 @@ class LAGR_Collector {
 		if ( $do_translate && '' !== $readme_html ) {
 			$tr = LAGR_Translate::translate_html( $readme_html );
 			if ( '' !== $tr ) {
-				update_post_meta( $post_id, '_gh_readme_html_tr', $tr );
-				return array( 'ok' => true, 'msg' => 'README + перевод' );
+				update_post_meta( $post_id, '_gh_readme_html_tr', self::sanitize_readme_html( $tr ) );
+				return array( 'ok' => true, 'msg' => 'README + перевод (' . LAGR_Translate::engine() . ')' );
 			}
 			return array( 'ok' => true, 'msg' => 'README (перевод не удался — см. лог)' );
 		}
