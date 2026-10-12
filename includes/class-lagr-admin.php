@@ -331,7 +331,7 @@ class LAGR_Admin {
 				<table class="form-table">
 					<tr><th>Промт генерации</th><td>
 						<textarea name="llm_system_prompt" rows="14" style="width:100%;max-width:820px;font-family:monospace"><?php echo esc_textarea( '' !== $s['llm_system_prompt'] ? $s['llm_system_prompt'] : LAGR_LLM_Client::DEFAULT_SYSTEM_PROMPT ); ?></textarea>
-						<p class="description">Системный промт для генерации описаний. Модель должна возвращать <strong>строго JSON</strong> с полями <code>short_description</code>, <code>full_description</code> (и <code>tags</code>, <code>install_command</code>). Очистите поле и сохраните — вернётся встроенный промт.</p>
+						<p class="description">Активный системный промт для генерации описаний (предзаполнен базовым — редактируйте под себя). Модель должна возвращать <strong>строго JSON</strong> с полями <code>short_description</code>, <code>full_description</code> (и <code>tags</code>, <code>install_command</code>).</p>
 					</td></tr>
 					<tr><th>Длина полного описания (max_tokens)</th><td><input type="number" name="llm_max_tokens" value="<?php echo esc_attr( $s['llm_max_tokens'] ); ?>" min="100" step="50" style="width:120px"> <span class="description">потолок длины full_description (900 ≈ 2–4 абзаца). Слишком малое значение обрежет JSON-ответ и генерация не пройдёт — рекомендуется ≥ 700.</span></td></tr>
 					<tr><th>Лимит короткого описания, символов</th><td><input type="number" name="llm_short_limit" value="<?php echo esc_attr( $s['llm_short_limit'] ); ?>" min="1" step="10" style="width:120px"> <span class="description">жёсткая обрезка short_description</span></td></tr>
