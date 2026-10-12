@@ -10,7 +10,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class LAGR_LLM_Client {
 
-	const SYSTEM_PROMPT = <<<PROMPT
+	/** Built-in default — used when the admin "Промт генерации" field is left empty. */
+	const DEFAULT_SYSTEM_PROMPT = <<<PROMPT
 Ты пишешь описание GitHub-репозитория для карточки каталога на сайте.
 Аудитория — разработчики, которые выбирают инструмент для своей задачи.
 
@@ -129,14 +130,21 @@ PROMPT;
 
 		$user_prompt = $this->build_user_prompt( $repo );
 
+		// All three are editable in the settings (fall back to the built-ins).
+		$system_prompt = trim( (string) LAGR_Settings::get( 'llm_system_prompt', '' ) );
+		if ( '' === $system_prompt ) {
+			$system_prompt = self::DEFAULT_SYSTEM_PROMPT;
+		}
+		$max_tokens = max( 100, (int) LAGR_Settings::get( 'llm_max_tokens', 900 ) );
+
 		$payload = array(
 			'model'       => $config['model'],
-			'max_tokens'  => 900,
+			'max_tokens'  => $max_tokens,
 			'temperature' => 0.5,
 			'messages'    => array(
 				array(
 					'role'    => 'system',
-					'content' => self::SYSTEM_PROMPT,
+					'content' => $system_prompt,
 				),
 				array(
 					'role'    => 'user',
@@ -164,8 +172,9 @@ PROMPT;
 	}
 
 	private function build_user_prompt( array $repo ) {
+		$readme_chars = max( 0, (int) LAGR_Settings::get( 'llm_readme_chars', 3000 ) );
 		return sprintf(
-			"Репозиторий: %s\nЗвёзд: %d\nФорков: %d\nЯзык: %s\nЛицензия: %s\nHomepage: %s\nАвторские topics: %s\nОписание (из GitHub): %s\n\nREADME (первые 3000 символов):\n%s",
+			"Репозиторий: %s\nЗвёзд: %d\nФорков: %d\nЯзык: %s\nЛицензия: %s\nHomepage: %s\nАвторские topics: %s\nОписание (из GitHub): %s\n\nREADME (первые %d символов):\n%s",
 			$repo['full_name'] ?? '',
 			(int) ( $repo['stars'] ?? 0 ),
 			(int) ( $repo['forks'] ?? 0 ),
@@ -174,7 +183,8 @@ PROMPT;
 			$repo['homepage'] ?: '—',
 			! empty( $repo['topics'] ) ? implode( ', ', (array) $repo['topics'] ) : '—',
 			$repo['description'] ?: '—',
-			mb_substr( (string) ( $repo['readme'] ?? '' ), 0, 3000 )
+			$readme_chars,
+			mb_substr( (string) ( $repo['readme'] ?? '' ), 0, $readme_chars )
 		);
 	}
 

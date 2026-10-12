@@ -327,6 +327,17 @@ class LAGR_Admin {
 					</td></tr>
 				</table>
 
+				<h3>Параметры генерации описаний</h3>
+				<table class="form-table">
+					<tr><th>Промт генерации</th><td>
+						<textarea name="llm_system_prompt" rows="14" style="width:100%;max-width:820px;font-family:monospace"><?php echo esc_textarea( '' !== $s['llm_system_prompt'] ? $s['llm_system_prompt'] : LAGR_LLM_Client::DEFAULT_SYSTEM_PROMPT ); ?></textarea>
+						<p class="description">Системный промт для генерации описаний. Модель должна возвращать <strong>строго JSON</strong> с полями <code>short_description</code>, <code>full_description</code> (и <code>tags</code>, <code>install_command</code>). Очистите поле и сохраните — вернётся встроенный промт.</p>
+					</td></tr>
+					<tr><th>Длина полного описания (max_tokens)</th><td><input type="number" name="llm_max_tokens" value="<?php echo esc_attr( $s['llm_max_tokens'] ); ?>" min="100" step="50" style="width:120px"> <span class="description">потолок длины full_description (900 ≈ 2–4 абзаца). Слишком малое значение обрежет JSON-ответ и генерация не пройдёт — рекомендуется ≥ 700.</span></td></tr>
+					<tr><th>Лимит короткого описания, символов</th><td><input type="number" name="llm_short_limit" value="<?php echo esc_attr( $s['llm_short_limit'] ); ?>" min="1" step="10" style="width:120px"> <span class="description">жёсткая обрезка short_description</span></td></tr>
+					<tr><th>README на вход модели, символов</th><td><input type="number" name="llm_readme_chars" value="<?php echo esc_attr( $s['llm_readme_chars'] ); ?>" min="0" step="500" style="width:120px"> <span class="description">сколько README подаётся в промт</span></td></tr>
+				</table>
+
 				<h3>Yandex Foundation Models</h3>
 				<table class="form-table">
 					<tr><th>API Key</th><td><input type="password" name="yandex_api_key" value="<?php echo esc_attr( $s['yandex_api_key'] ); ?>" style="width:400px"></td></tr>
@@ -426,6 +437,7 @@ class LAGR_Admin {
 			'timeweb_agent_id', 'timeweb_token', 'timeweb_proxy_source',
 			'openrouter_api_key', 'openrouter_model',
 			'extra_topics_taxonomy', 'seo_plugin',
+			'llm_max_tokens', 'llm_short_limit', 'llm_readme_chars',
 		);
 
 		$values = array();
@@ -433,6 +445,11 @@ class LAGR_Admin {
 			if ( isset( $_POST[ $key ] ) ) {
 				$values[ $key ] = sanitize_text_field( wp_unslash( $_POST[ $key ] ) );
 			}
+		}
+
+		// Multiline fields keep their newlines (sanitize_text_field would flatten them).
+		if ( isset( $_POST['llm_system_prompt'] ) ) {
+			$values['llm_system_prompt'] = sanitize_textarea_field( wp_unslash( $_POST['llm_system_prompt'] ) );
 		}
 		foreach ( $checkboxes as $key ) {
 			$values[ $key ] = isset( $_POST[ $key ] ) ? 1 : 0;

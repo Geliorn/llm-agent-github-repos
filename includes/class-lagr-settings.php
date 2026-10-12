@@ -33,6 +33,11 @@ class LAGR_Settings {
 			'collect_readme'        => 1,
 			'llm_enabled'           => 0,
 			'llm_provider'          => 'deepseek',
+			// Description-generation tuning (all editable in the admin).
+			'llm_system_prompt'     => '', // '' = use LAGR_LLM_Client::DEFAULT_SYSTEM_PROMPT
+			'llm_max_tokens'        => 900,   // ceiling on the full description length
+			'llm_short_limit'       => 200,   // hard cap on the short description, chars
+			'llm_readme_chars'      => 3000,  // how much README is fed to the model
 			'yandex_api_key'        => '',
 			'yandex_folder_id'      => '',
 			'yandex_model'          => 'deepseek-v32/latest',

@@ -169,6 +169,7 @@ class LAGR_Collector {
 			$llm_result = $llm->generate_descriptions( $repo_data );
 		}
 
+		$short_limit = max( 1, (int) LAGR_Settings::get( 'llm_short_limit', 200 ) );
 		if ( $llm_result ) {
 			$short_description = $llm_result['short_description'];
 			$generated_html    = $llm_result['full_description'];
@@ -177,10 +178,13 @@ class LAGR_Collector {
 			$generated_by_llm   = true;
 		} else {
 			$short_description = $repo_data['description']
-				? mb_substr( $repo_data['description'], 0, 200 )
+				? $repo_data['description']
 				: self::first_readme_line( $readme );
 			$extra_tags         = array();
 		}
+		// Hard cap the short description to the configured limit (safety net — the
+		// prompt also asks for it, but a model can overshoot).
+		$short_description = mb_substr( (string) $short_description, 0, $short_limit );
 
 		// Primary post_content stays "best available" (generated when present,
 		// otherwise the rendered README) for SEO/excerpt and any template still
@@ -291,7 +295,7 @@ class LAGR_Collector {
 		foreach ( preg_split( '/\r?\n/', trim( (string) $readme ) ) as $line ) {
 			$line = trim( strip_tags( $line ), "# \t" );
 			if ( '' !== $line && 0 !== strpos( $line, '![' ) ) {
-				return mb_substr( $line, 0, 200 );
+				return mb_substr( $line, 0, max( 1, (int) LAGR_Settings::get( 'llm_short_limit', 200 ) ) );
 			}
 		}
 		return '';
