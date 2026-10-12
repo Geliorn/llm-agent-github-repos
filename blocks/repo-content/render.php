@@ -41,7 +41,7 @@ $tabs = array();
 // Описание — always present; a muted placeholder until an LLM description exists.
 $tabs['desc'] = array(
 	'label' => 'Описание',
-	'html'  => '' !== $generated ? wp_kses_post( $generated ) : '<p class="lagr-tab-empty">Описание пока не сгенерировано.</p>',
+	'html'  => '' !== $generated ? wp_kses_post( $generated ) : '<p class="lagr-tab-empty">Описания пока нет</p>',
 	'has'   => '' !== $generated,
 );
 
