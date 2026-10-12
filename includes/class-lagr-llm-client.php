@@ -83,7 +83,10 @@ PROMPT;
 				),
 			);
 
-			$content = $this->call( $config, $payload, 1 );
+			// More retries than the description path: a long README is many
+			// chunks, and one transient network timeout would otherwise sink the
+			// whole translation.
+			$content = $this->call( $config, $payload, 3 );
 			if ( ! $content ) {
 				LAGR_Log::add( 'Перевод README (LLM): пустой/ошибочный ответ от провайдера ' . $provider );
 				return '';
@@ -189,14 +192,22 @@ PROMPT;
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return $attempts_left > 0 ? $this->call( $config, $payload, $attempts_left - 1 ) : null;
+			if ( $attempts_left > 0 ) {
+				sleep( 2 ); // brief backoff — rides out transient DNS/connect timeouts.
+				return $this->call( $config, $payload, $attempts_left - 1 );
+			}
+			return null;
 		}
 
 		$code = wp_remote_retrieve_response_code( $response );
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
 
 		if ( 200 !== $code || empty( $body['choices'][0]['message']['content'] ) ) {
-			return $attempts_left > 0 ? $this->call( $config, $payload, $attempts_left - 1 ) : null;
+			if ( $attempts_left > 0 ) {
+				sleep( 2 );
+				return $this->call( $config, $payload, $attempts_left - 1 );
+			}
+			return null;
 		}
 
 		return trim( $body['choices'][0]['message']['content'] );
