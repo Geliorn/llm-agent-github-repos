@@ -16,13 +16,18 @@ if ( ! $post_id ) {
 }
 
 $generated = trim( (string) get_post_meta( $post_id, '_gh_generated_html', true ) );
-// Prefer the translated README when one exists (translation replaces the
-// original in the single README tab); otherwise the original GitHub rendering.
-$readme_tr = trim( (string) get_post_meta( $post_id, '_gh_readme_html_tr', true ) );
-$readme    = '' !== $readme_tr ? $readme_tr : trim( (string) get_post_meta( $post_id, '_gh_readme_html', true ) );
+
+// README display is optional (settings: collect_readme). When off, no README
+// tab is shown even for repos that already have one stored — leaving only the
+// AI description. Prefer a translated README when present, else the original.
+$show_readme = (bool) LAGR_Settings::get( 'collect_readme', 1 );
+$readme_tr   = trim( (string) get_post_meta( $post_id, '_gh_readme_html_tr', true ) );
+$readme      = $show_readme
+	? ( '' !== $readme_tr ? $readme_tr : trim( (string) get_post_meta( $post_id, '_gh_readme_html', true ) ) )
+	: '';
 
 // Posts collected before the readme/generated split kept everything in
-// post_content — fall back to it for the README tab.
+// post_content — use it as a last resort so the page is never empty.
 if ( '' === $readme && '' === $generated ) {
 	$readme = trim( (string) get_post_field( 'post_content', $post_id ) );
 }

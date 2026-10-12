@@ -2,7 +2,7 @@
 /**
  * Plugin Name: GitHub Repo Collector
  * Description: Универсальный сборщик подборок GitHub-репозиториев по настраиваемым правилам (топики, звёзды, свежесть), с публикацией карточек на сайте. Самодостаточен — сам регистрирует тип записи и поля, не зависит от ACF/CPT UI.
- * Version: 0.6.1
+ * Version: 0.6.2
  * Author: llm-agent.ru
  * Text Domain: lagr
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'LAGR_VERSION', '0.6.1' );
+define( 'LAGR_VERSION', '0.6.2' );
 define( 'LAGR_PLUGIN_FILE', __FILE__ );
 define( 'LAGR_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LAGR_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

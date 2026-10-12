@@ -21,6 +21,33 @@ class LAGR_Admin {
 		add_action( 'admin_post_lagr_regenerate_secret', array( __CLASS__, 'handle_regenerate_secret' ) );
 		add_action( 'admin_post_lagr_publish_repo', array( __CLASS__, 'handle_publish_repo' ) );
 		add_action( 'admin_post_lagr_run_rule_now', array( __CLASS__, 'handle_run_rule_now' ) );
+		add_filter( 'manage_github_repo_posts_columns', array( __CLASS__, 'repo_list_columns' ) );
+		add_action( 'manage_github_repo_posts_custom_column', array( __CLASS__, 'repo_list_column' ), 10, 2 );
+	}
+
+	/**
+	 * Add a "Создан на GitHub" column to the repo list. The built-in "Дата"
+	 * column now shows the site publication date (post_date), so the GitHub
+	 * creation date gets its own column from the _gh_created_at meta.
+	 */
+	public static function repo_list_columns( $columns ) {
+		$new = array();
+		foreach ( $columns as $key => $label ) {
+			$new[ $key ] = $label;
+			if ( 'title' === $key ) {
+				$new['gh_created'] = 'Создан на GitHub';
+			}
+		}
+		return $new;
+	}
+
+	public static function repo_list_column( $column, $post_id ) {
+		if ( 'gh_created' !== $column ) {
+			return;
+		}
+		$raw = (string) get_post_meta( $post_id, '_gh_created_at', true );
+		$ts  = $raw ? strtotime( $raw ) : 0;
+		echo $ts ? esc_html( wp_date( 'd.m.Y', $ts ) ) : '—';
 	}
 
 	public static function register_menu() {
@@ -194,6 +221,12 @@ class LAGR_Admin {
 					<tr><th>Лицензия</th><td><label><input type="checkbox" name="collect_license" value="1" <?php checked( $s['collect_license'] ); ?>> собирать лицензию репозитория и показывать её в карточках/на странице записи</label></td></tr>
 				</table>
 
+				<h2>README</h2>
+				<p class="description">README сохраняется и показывается отдельной вкладкой на странице репозитория. Выключите, чтобы оставить только AI-описание — README при этом всё равно используется как вход для генерации описания, но не сохраняется и не показывается отдельной вкладкой.</p>
+				<table class="form-table">
+					<tr><th>Собирать README</th><td><label><input type="checkbox" name="collect_readme" value="1" <?php checked( $s['collect_readme'] ); ?>> сохранять README и показывать его отдельной вкладкой</label></td></tr>
+				</table>
+
 				<h2>Топики репозитория</h2>
 				<table class="form-table">
 					<tr>
@@ -349,7 +382,7 @@ class LAGR_Admin {
 
 		$checkboxes = array(
 			'optional_contributors', 'optional_releases', 'optional_languages', 'optional_top_files', 'llm_enabled',
-			'collect_language', 'collect_license', 'translate_readme',
+			'collect_language', 'collect_license', 'collect_readme', 'translate_readme',
 			'integration_ratings', 'integration_related_posts', 'integration_filters',
 			'integration_external_links', 'integration_relevanssi',
 		);

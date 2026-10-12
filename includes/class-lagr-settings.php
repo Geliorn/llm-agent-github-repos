@@ -27,6 +27,10 @@ class LAGR_Settings {
 			// response); this only gates the taxonomy term + its display in patterns.
 			'collect_language'      => 0,
 			'collect_license'       => 0,
+			// Fetch, store and show the README (as its own tab). Off = keep only
+			// the AI-generated description; the raw README is still read as input
+			// for description generation, just not saved or displayed.
+			'collect_readme'        => 1,
 			'llm_enabled'           => 0,
 			'llm_provider'          => 'deepseek',
 			'yandex_api_key'        => '',

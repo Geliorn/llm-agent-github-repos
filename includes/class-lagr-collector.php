@@ -152,8 +152,12 @@ class LAGR_Collector {
 		// entirely when the LLM ran), leaving no way to show both. Rendered by
 		// GitHub itself (correct links/code/tables), with an optional Yandex
 		// translation kept in a sibling meta.
-		$readme_html    = self::build_readme_html( $client, $full_name, $readme );
-		$readme_html_tr = LAGR_Translate::enabled() ? LAGR_Translate::translate_html( $readme_html ) : '';
+		// README collection is optional: when off we keep only the AI description.
+		// The raw $readme above is still used as input for description generation;
+		// we just skip the display-HTML fetch, storage and translation.
+		$collect_readme = (bool) LAGR_Settings::get( 'collect_readme', 1 );
+		$readme_html    = $collect_readme ? self::build_readme_html( $client, $full_name, $readme ) : '';
+		$readme_html_tr = ( $collect_readme && LAGR_Translate::enabled() ) ? LAGR_Translate::translate_html( $readme_html ) : '';
 		$readme_html_tr = '' !== $readme_html_tr ? self::sanitize_readme_html( $readme_html_tr ) : '';
 
 		$generated_by_llm = false;
@@ -183,23 +187,16 @@ class LAGR_Collector {
 		// using core/post-content; the tabs read the two dedicated metas below.
 		$full_description = $generated_html ? $generated_html : $readme_html;
 
-		// Use the repo's own dates rather than "now" — core/post-date (incl. "modified")
-		// and any date-based sorting/display should reflect GitHub reality, not collection time.
-		$post_date     = ! empty( $item['created_at'] ) ? get_date_from_gmt( gmdate( 'Y-m-d H:i:s', strtotime( $item['created_at'] ) ) ) : current_time( 'mysql' );
-		$post_date_gmt = ! empty( $item['created_at'] ) ? gmdate( 'Y-m-d H:i:s', strtotime( $item['created_at'] ) ) : current_time( 'mysql', true );
-		$modified          = ! empty( $item['pushed_at'] ) ? get_date_from_gmt( gmdate( 'Y-m-d H:i:s', strtotime( $item['pushed_at'] ) ) ) : $post_date;
-		$modified_gmt      = ! empty( $item['pushed_at'] ) ? gmdate( 'Y-m-d H:i:s', strtotime( $item['pushed_at'] ) ) : $post_date_gmt;
-
+		// post_date is the SITE publication date (when the repo was collected) —
+		// the default WP "now". GitHub's own created/pushed/updated dates live in
+		// their own meta (_gh_created_at / _gh_pushed_at / _gh_updated_at) and are
+		// what the single page shows via the lagr/date bindings.
 		$post_id = wp_insert_post(
 			array(
-				'post_type'         => $target_post_type,
-				'post_title'        => $full_name,
-				'post_content'      => $full_description,
-				'post_status'       => ( 'publish' === $publish_mode ) ? 'publish' : 'draft',
-				'post_date'         => $post_date,
-				'post_date_gmt'     => $post_date_gmt,
-				'post_modified'     => $modified,
-				'post_modified_gmt' => $modified_gmt,
+				'post_type'    => $target_post_type,
+				'post_title'   => $full_name,
+				'post_content' => $full_description,
+				'post_status'  => ( 'publish' === $publish_mode ) ? 'publish' : 'draft',
 			),
 			true
 		);
