@@ -23,6 +23,37 @@ class LAGR_Admin {
 		add_action( 'admin_post_lagr_run_rule_now', array( __CLASS__, 'handle_run_rule_now' ) );
 		add_filter( 'manage_github_repo_posts_columns', array( __CLASS__, 'repo_list_columns' ) );
 		add_action( 'manage_github_repo_posts_custom_column', array( __CLASS__, 'repo_list_column' ), 10, 2 );
+		add_filter( 'manage_github_repo_rule_posts_columns', array( __CLASS__, 'rule_list_columns' ) );
+		add_action( 'manage_github_repo_rule_posts_custom_column', array( __CLASS__, 'rule_list_column' ), 10, 2 );
+	}
+
+	/** Rule list: add Вкл/выкл, Интервал, Режим публикации columns after the title. */
+	public static function rule_list_columns( $columns ) {
+		$new = array();
+		foreach ( $columns as $key => $label ) {
+			$new[ $key ] = $label;
+			if ( 'title' === $key ) {
+				$new['lagr_enabled']  = 'Вкл/выкл';
+				$new['lagr_interval'] = 'Интервал';
+				$new['lagr_publish']  = 'Режим публикации';
+			}
+		}
+		return $new;
+	}
+
+	public static function rule_list_column( $column, $post_id ) {
+		switch ( $column ) {
+			case 'lagr_enabled':
+				echo get_post_meta( $post_id, '_lagr_enabled', true ) ? '✅ вкл' : '— выкл';
+				break;
+			case 'lagr_interval':
+				$minutes = (int) get_post_meta( $post_id, '_lagr_interval_minutes', true );
+				echo $minutes ? esc_html( $minutes . ' мин' ) : '—';
+				break;
+			case 'lagr_publish':
+				echo 'publish' === get_post_meta( $post_id, '_lagr_publish_mode', true ) ? 'Сразу публиковать' : 'Черновик на модерацию';
+				break;
+		}
 	}
 
 	/**
