@@ -82,6 +82,11 @@ class LAGR_Settings {
 			'tags_auto_approve_count' => 15,
 			'tags_regulator_enabled'  => 0,   // switched on by the migration
 
+			// Pinterest pin (see LAGR_Pin_Service). Texts ride the description request.
+			'pin_texts_in_prompt'     => 1,
+			'pin_on_collect'          => 1,
+			'pin_default_preset'      => 'dark',
+
 			// SEO plugin whose own meta field gets the generated description — 'none' skips it.
 			'seo_plugin'                    => 'yoast',
 

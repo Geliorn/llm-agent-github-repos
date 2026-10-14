@@ -295,11 +295,21 @@ class LAGR_Collector {
 				wp_set_object_terms( $post_id, $extra_topics, $extra_topics_taxonomy, true );
 			}
 		}
+		// Pinterest pin: the three block texts came with the description request;
+		// the picture itself is built right away when the setting asks for it.
+		if ( ! empty( $llm_result['pin_texts'] ) ) {
+			LAGR_Pin_Service::save_texts( $post_id, $llm_result['pin_texts'] );
+		}
+
 		if ( $repo_data['language'] && LAGR_Settings::get( 'collect_language' ) ) {
 			wp_set_object_terms( $post_id, array( $repo_data['language'] ), 'repo_language' );
 		}
 		if ( $repo_data['license'] && LAGR_Settings::get( 'collect_license' ) ) {
 			wp_set_object_terms( $post_id, array( $repo_data['license'] ), 'repo_license' );
+		}
+
+		if ( LAGR_Settings::get( 'pin_on_collect', 1 ) ) {
+			LAGR_Pin_Service::create_for_post( $post_id );
 		}
 
 		return $post_id;

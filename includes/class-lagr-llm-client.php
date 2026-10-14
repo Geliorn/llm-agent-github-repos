@@ -141,7 +141,10 @@ PROMPT;
 		// admin's own prompt keeps working, tags follow the vocabulary rules.
 		$vocabulary = null !== $unresolved ? LAGR_Vocabulary::prompt_block( (array) $unresolved ) : '';
 		$system_prompt .= $vocabulary;
-		$max_tokens = max( 100, (int) LAGR_Settings::get( 'llm_max_tokens', 900 ) ) + ( '' !== $vocabulary ? 250 : 0 );
+		// Texts of the three Pinterest blocks ride the same request — no extra call.
+		$pin_block      = LAGR_Settings::get( 'pin_texts_in_prompt', 1 ) ? self::pin_prompt_block() : '';
+		$system_prompt .= $pin_block;
+		$max_tokens = max( 100, (int) LAGR_Settings::get( 'llm_max_tokens', 900 ) ) + ( '' !== $vocabulary ? 250 : 0 ) + ( '' !== $pin_block ? 350 : 0 );
 
 		$payload = array(
 			'model'       => $config['model'],
@@ -175,8 +178,106 @@ PROMPT;
 			// {tags, mapped, proposed} — validated against the vocabulary in LAGR_Vocabulary::assign().
 			'tag_block'         => '' !== $vocabulary ? LAGR_Vocabulary::llm_block_from( $parsed ) : null,
 			'install_command'   => sanitize_text_field( $parsed['install_command'] ?? '' ),
+			'pin_texts'         => '' !== $pin_block ? self::pin_texts_from( $parsed ) : null,
 			'model'             => $config['model'],
 		);
+	}
+
+	// ------------------------------------------------------ Pinterest texts
+
+	/** Budget per block comes from the default pin preset — measured on its layout. */
+	public static function pin_prompt_block() {
+		$budget = LAGR_Pin_Composer::block_budget( LAGR_Pin_Presets::get() );
+		return sprintf(
+			"\n\nPINTEREST-КАРТОЧКА. Добавь в JSON-ответ ещё три поля — тексты трёх блоков картинки:\n" .
+			"  \"pin_what\": \"Что это? — что за инструмент и для кого\",\n" .
+			"  \"pin_does\": \"Что это делает? — главное, что он умеет\",\n" .
+			"  \"pin_problem\": \"Какую проблему решает? — какая боль уходит\"\n" .
+			"Каждое поле — до %d символов, 1-2 законченных предложения. Без названия репозитория в начале, без эмодзи и хэштегов, без перечислений через запятую. Три поля не повторяют друг друга. Язык: русский.",
+			$budget
+		);
+	}
+
+	public static function pin_texts_from( array $parsed ) {
+		$out = array();
+		foreach ( array( 'pin_what', 'pin_does', 'pin_problem' ) as $key ) {
+			$out[] = sanitize_text_field( is_string( $parsed[ $key ] ?? null ) ? $parsed[ $key ] : '' );
+		}
+		return array_filter( $out ) ? $out : null;
+	}
+
+	/** The three pin texts alone — for repos collected before the pin existed. */
+	public function pin_texts( array $repo ) {
+		$provider = LAGR_Settings::get( 'llm_provider', 'deepseek' );
+		$config   = LAGR_Settings::llm_provider_config( $provider );
+		$system   = "Ты пишешь тексты для Pinterest-карточки GitHub-репозитория. Верни СТРОГО JSON-объект (без markdown-обёртки) только с полями pin_what, pin_does, pin_problem. Не придумывай фактов, которых нет в данных." . self::pin_prompt_block();
+
+		$content = $this->call(
+			$config,
+			array(
+				'model'       => $config['model'],
+				'max_tokens'  => 600,
+				'temperature' => 0.4,
+				'messages'    => array(
+					array(
+						'role'    => 'system',
+						'content' => $system,
+					),
+					array(
+						'role'    => 'user',
+						'content' => $this->build_user_prompt( $repo ),
+					),
+				),
+			),
+			1
+		);
+		$parsed = $content ? $this->extract_json( $content ) : null;
+		$texts  = $parsed ? self::pin_texts_from( $parsed ) : null;
+		return ( $texts && 3 === count( array_filter( $texts ) ) ) ? $texts : null;
+	}
+
+	/**
+	 * Rewrites a block shorter, keeping the meaning — never cuts it (same rule
+	 * as LAA_Title_Shortener in llm-agent-articles). Returns '' when the model
+	 * can't land inside the limit; the caller then reports instead of cutting.
+	 */
+	public function shorten_text( $text, $max ) {
+		$text = trim( (string) $text );
+		$max  = (int) $max;
+		if ( $max < 1 || mb_strlen( $text ) <= $max ) {
+			return $text;
+		}
+		$provider = LAGR_Settings::get( 'llm_provider', 'deepseek' );
+		$config   = LAGR_Settings::llm_provider_config( $provider );
+		$system   = 'Ты редактор. Сократи текст, не потеряв смысл. Верни СТРОГО JSON {"text": "..."}. Это переформулировка, а не обрезка: нельзя оборвать фразу, нельзя заканчивать многоточием, нельзя добавлять новых фактов. Язык — тот же.';
+
+		for ( $attempt = 1; $attempt <= 2; $attempt++ ) {
+			$content = $this->call(
+				$config,
+				array(
+					'model'       => $config['model'],
+					'max_tokens'  => 300,
+					'temperature' => 0.3,
+					'messages'    => array(
+						array(
+							'role'    => 'system',
+							'content' => $system,
+						),
+						array(
+							'role'    => 'user',
+							'content' => sprintf( "Предел: %d символов (сейчас %d).%s\nТекст: %s", $max, mb_strlen( $text ), $attempt > 1 ? ' Прошлый вариант был длиннее предела — сократи сильнее.' : '', $text ),
+						),
+					),
+				),
+				1
+			);
+			$parsed    = $content ? $this->extract_json( $content ) : null;
+			$candidate = trim( sanitize_text_field( (string) ( $parsed['text'] ?? '' ) ) );
+			if ( '' !== $candidate && mb_strlen( $candidate ) <= $max && '…' !== mb_substr( $candidate, -1 ) ) {
+				return $candidate;
+			}
+		}
+		return '';
 	}
 
 	/**

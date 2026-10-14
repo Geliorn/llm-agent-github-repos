@@ -146,6 +146,90 @@ class LAGR_CLI {
 }
 
 /**
+ * Pinterest pins: `wp github-repos pin`.
+ */
+class LAGR_Pin_CLI {
+
+	public static function register() {
+		WP_CLI::add_command( 'github-repos pin', __CLASS__ );
+	}
+
+	/**
+	 * Build Pinterest pins (1000×1500 by default) for repos.
+	 *
+	 * [<id>...]
+	 * : Repo post IDs.
+	 *
+	 * [--all]
+	 * : Every github_repo post.
+	 *
+	 * [--missing]
+	 * : Only repos without a pin yet (implies --all when no IDs are given).
+	 *
+	 * [--preset=<id>]
+	 * : Preset id (default: the one chosen on the "Pinterest-картинки" screen).
+	 *
+	 * [--retext]
+	 * : Ask the model for new block texts first.
+	 *
+	 * [--limit=<n>]
+	 * : At most N repos.
+	 *
+	 * ## EXAMPLES
+	 *     wp github-repos pin 123 456
+	 *     wp github-repos pin --missing --limit=50
+	 *
+	 * @when after_wp_load
+	 */
+	public function __invoke( $args, $assoc_args ) {
+		$ids     = array_map( 'intval', $args );
+		$missing = isset( $assoc_args['missing'] );
+		if ( ! $ids && ( isset( $assoc_args['all'] ) || $missing ) ) {
+			$query = array(
+				'post_type'      => 'github_repo',
+				'post_status'    => array( 'publish', 'draft', 'pending', 'future', 'private' ),
+				'posts_per_page' => isset( $assoc_args['limit'] ) ? (int) $assoc_args['limit'] : -1,
+				'fields'         => 'ids',
+				'orderby'        => 'ID',
+				'order'          => 'ASC',
+			);
+			if ( $missing ) {
+				$query['meta_query'] = array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+					array(
+						'key'     => LAGR_Pin_Service::META_IMAGE,
+						'compare' => 'NOT EXISTS',
+					),
+				);
+			}
+			$ids = get_posts( $query );
+		}
+		if ( ! $ids ) {
+			WP_CLI::error( 'Укажите ID записей, --all или --missing.' );
+		}
+
+		$ok   = 0;
+		$fail = 0;
+		foreach ( $ids as $id ) {
+			$r = LAGR_Pin_Service::create_for_post(
+				$id,
+				array(
+					'preset' => isset( $assoc_args['preset'] ) ? sanitize_key( $assoc_args['preset'] ) : '',
+					'retext' => isset( $assoc_args['retext'] ),
+				)
+			);
+			if ( $r['ok'] ) {
+				++$ok;
+				WP_CLI::log( sprintf( '#%d %s → вложение #%d%s', $id, get_the_title( $id ), $r['attachment_id'], $r['notes'] ? ' (' . implode( '; ', $r['notes'] ) . ')' : '' ) );
+			} else {
+				++$fail;
+				WP_CLI::warning( sprintf( '#%d %s: %s', $id, get_the_title( $id ), $r['error'] ) );
+			}
+		}
+		WP_CLI::success( sprintf( 'Собрано %d, не собрано %d.', $ok, $fail ) );
+	}
+}
+
+/**
  * Task vocabulary (post_tag): seed, migration, regulator, queue operations.
  * `wp github-repos tags <command>`.
  */
@@ -347,3 +431,4 @@ class LAGR_Tags_CLI {
 
 LAGR_CLI::register();
 LAGR_Tags_CLI::register();
+LAGR_Pin_CLI::register();
