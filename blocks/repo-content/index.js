@@ -5,7 +5,7 @@
 	blocks.registerBlockType( 'lagr/repo-content', {
 		edit: function() {
 			var blockProps = blockEditor.useBlockProps();
-			return el( 'p', blockProps, el( 'em', null, '▤ Вкладки: «Описание» (LLM) и «README» — содержимое подставляется из записи на странице' ) );
+			return el( 'p', blockProps, el( 'em', null, '▤ Вкладки «Описание» (LLM) и «README», под ними «Частые вопросы» — содержимое подставляется из записи на странице' ) );
 		},
 		save: function() {
 			return null;

@@ -41,6 +41,8 @@ class LAGR_Meta_Fields {
 			'_gh_languages_json'     => 'string',
 			'_gh_top_files_json'     => 'string',
 			'_gh_generated_by_llm'   => 'boolean',
+			'_gh_faq_tasks'          => 'string',
+			'_gh_faq_json'           => 'string',
 		);
 	}
 
@@ -173,7 +175,8 @@ class LAGR_Meta_Fields {
 		echo '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">';
 		self::field( $post->ID, '_gh_full_name', 'full_name (owner/repo)', 'text' );
 		self::field( $post->ID, 'short_description', 'Короткий анонс', 'textarea' );
-		self::field( $post->ID, 'install_command', 'Команда установки', 'text', array( 'description' => 'Напр. npx -y @scope/pkg. Пусто — на странице покажется git clone.' ) );
+		self::field( $post->ID, 'install_command', 'Команда установки', 'text', array( 'description' => 'Напр. npx -y @scope/pkg. Пусто — на странице покажется git clone. Выводится в FAQ «Как установить…».' ) );
+		self::field( $post->ID, '_gh_faq_tasks', 'FAQ: какие задачи решает', 'textarea', array( 'description' => 'Ответ на вопрос «Какие задачи решает…» в блоке FAQ. Пусто — подставится короткий анонс.' ) );
 		self::field( $post->ID, '_gh_stars', 'Звёзды', 'number' );
 		self::field( $post->ID, '_gh_forks', 'Форки', 'number' );
 		self::field( $post->ID, '_gh_watchers', 'Watchers', 'number' );

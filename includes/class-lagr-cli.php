@@ -143,6 +143,82 @@ class LAGR_CLI {
 		}
 		WP_CLI::success( sprintf( 'Готово: %d обработано, %d пропущено.', $ok, $fail ) );
 	}
+
+	/**
+	 * Re-generate the description, FAQ and SEO meta of already collected repos
+	 * with the current prompt (lead, features, use cases, 3 FAQ questions,
+	 * meta title/description). One GitHub request (README) + one LLM request
+	 * per repo. Hand-edited short_description / install_command are kept.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--post=<id>]
+	 * : Process a single repo post id instead of all.
+	 *
+	 * [--limit=<n>]
+	 * : Process at most N repos. Default: all.
+	 *
+	 * [--missing]
+	 * : Only repos that have no LLM FAQ yet (collected before 0.8.0).
+	 *
+	 * ## EXAMPLES
+	 *     wp github-repos regenerate --post=123
+	 *     wp github-repos regenerate --missing --limit=20
+	 */
+	public function regenerate( $args, $assoc_args ) {
+		if ( ! LAGR_Settings::get( 'llm_enabled' ) ) {
+			WP_CLI::error( 'Генерация LLM выключена в настройках плагина.' );
+		}
+		$limit  = isset( $assoc_args['limit'] ) ? (int) $assoc_args['limit'] : -1;
+		$single = isset( $assoc_args['post'] ) ? (int) $assoc_args['post'] : 0;
+
+		if ( $single ) {
+			$ids = array( $single );
+		} else {
+			$query = array(
+				'post_type'      => 'github_repo',
+				'post_status'    => 'any',
+				'posts_per_page' => $limit,
+				'fields'         => 'ids',
+				'meta_key'       => '_gh_full_name', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+			);
+			if ( isset( $assoc_args['missing'] ) ) {
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+				$query['meta_query'] = array(
+					'relation' => 'OR',
+					array(
+						'key'     => '_gh_faq_json',
+						'compare' => 'NOT EXISTS',
+					),
+					array(
+						'key'   => '_gh_faq_json',
+						'value' => '',
+					),
+				);
+			}
+			$ids = get_posts( $query );
+		}
+		if ( empty( $ids ) ) {
+			WP_CLI::warning( 'Нет репозиториев для обработки.' );
+			return;
+		}
+
+		$client = new LAGR_GitHub_Client();
+		$ok     = 0;
+		$fail   = 0;
+		foreach ( $ids as $id ) {
+			$r = LAGR_Collector::regenerate_description( $id, $client );
+			if ( $r['ok'] ) {
+				++$ok;
+				WP_CLI::log( sprintf( '#%d %s — %s', $id, get_post_meta( $id, '_gh_full_name', true ), $r['msg'] ) );
+			} else {
+				++$fail;
+				WP_CLI::warning( sprintf( '#%d — %s', $id, $r['msg'] ) );
+			}
+			usleep( 200000 ); // 0.2s — gentle on the GitHub API.
+		}
+		WP_CLI::success( sprintf( 'Готово: %d обновлено, %d пропущено.', $ok, $fail ) );
+	}
 }
 
 LAGR_CLI::register();

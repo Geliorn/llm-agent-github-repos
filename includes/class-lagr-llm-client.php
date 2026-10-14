@@ -12,6 +12,43 @@ class LAGR_LLM_Client {
 
 	/** Built-in default — used when the admin "Промт генерации" field is left empty. */
 	const DEFAULT_SYSTEM_PROMPT = <<<PROMPT
+Ты пишешь текст карточки GitHub-репозитория для каталога на сайте.
+Аудитория — разработчики, которые выбирают инструмент для своей задачи и приходят из поиска.
+
+Верни СТРОГО JSON-объект (без markdown-обёртки, без пояснений вокруг) с полями:
+{
+  "short_description": "1-2 предложения, до 200 символов, что это и для кого",
+  "meta_title": "заголовок для выдачи поисковика, до 60 символов: название репозитория + что это (например «mcp-server-git — MCP-сервер для работы с Git»)",
+  "meta_description": "описание для выдачи поисковика, 120-160 символов: что делает инструмент и чем полезен, с главным ключевым словом",
+  "lead": "1-2 предложения — прямой ответ на вопрос «что это за инструмент и кому он нужен»",
+  "features": ["4-6 ключевых возможностей, каждая — одна фраза до 120 символов"],
+  "use_cases": ["3-5 конкретных сценариев, для каких задач подходит, каждый — одна фраза"],
+  "full_description": "2-3 связных абзаца без заголовков и без маркированных списков — как устроен, чем отличается от аналогов, на что обратить внимание",
+  "tasks_answer": "2-3 предложения — ответ на вопрос «Какие задачи решает этот репозиторий?»",
+  "faq": [
+    {"question": "вопрос, который разработчик реально задал бы в поиске про этот инструмент", "answer": "ответ 1-3 предложения"}
+  ],
+  "tags": ["1-3 свободных тега по смыслу/назначению, на русском или английском — как уместнее"],
+  "install_command": "одна строка — основная команда установки/запуска из README (например npx -y ..., pip install ..., npm i ..., docker run ...); если в README её явно нет — пустая строка"
+}
+
+Ограничения:
+— Без эмодзи, без штампов («уникальный», «революционный», «мощный», «легко», «просто»)
+— Не придумывай цифры, факты, функции и примеры, которых нет в предоставленных данных
+— full_description пиши как будто объясняешь коллеге, без воды и без повторов из features и use_cases
+— faq — ровно 3 вопроса. НЕ спрашивай про установку и про то, какие задачи решает инструмент (эти вопросы уже есть). Подходящие темы: требования и совместимость, настройка и подключение, лицензия и коммерческое использование, отличие от аналогов, ограничения. Отвечай только тем, что следует из данных; если ответа в данных нет — выбери другой вопрос
+— Если авторские topics репозитория уже покрывают суть — tags может быть короче или пустым
+— install_command бери дословно из README (без markdown-разметки и без комментариев); если явной команды нет — оставь пустую строку, не придумывай
+— Язык: русский
+PROMPT;
+
+	/**
+	 * The previous built-in prompt (descriptions only, no FAQ/SEO fields). The
+	 * settings field is pre-filled with the built-in text and saved as-is, so
+	 * sites that ever pressed "Сохранить" hold this exact text in the option —
+	 * active_system_prompt() treats it as "still the default" and upgrades it.
+	 */
+	const LEGACY_SYSTEM_PROMPT = <<<PROMPT
 Ты пишешь описание GitHub-репозитория для карточки каталога на сайте.
 Аудитория — разработчики, которые выбирают инструмент для своей задачи.
 
@@ -31,6 +68,9 @@ class LAGR_LLM_Client {
 — install_command бери дословно из README (без markdown-разметки и без комментариев); если явной команды нет — оставь пустую строку, не придумывай
 — Язык: русский
 PROMPT;
+
+	/** Floor for max_tokens with the built-in prompt — its JSON is ~2x the old one. */
+	const MIN_TOKENS_STRUCTURED = 2500;
 
 	/** Separate prompt for README translation (keeps the HTML, translates only prose). %s = target language. */
 	const TRANSLATE_SYSTEM_PROMPT = <<<PROMPT
@@ -131,11 +171,13 @@ PROMPT;
 		$user_prompt = $this->build_user_prompt( $repo );
 
 		// All three are editable in the settings (fall back to the built-ins).
-		$system_prompt = trim( (string) LAGR_Settings::get( 'llm_system_prompt', '' ) );
-		if ( '' === $system_prompt ) {
-			$system_prompt = self::DEFAULT_SYSTEM_PROMPT;
+		$system_prompt = self::active_system_prompt();
+		$max_tokens    = max( 100, (int) LAGR_Settings::get( 'llm_max_tokens', 900 ) );
+		if ( self::DEFAULT_SYSTEM_PROMPT === $system_prompt ) {
+			// A truncated JSON fails to parse and loses the whole card, so the
+			// built-in prompt never runs with the old 900-token default.
+			$max_tokens = max( $max_tokens, self::MIN_TOKENS_STRUCTURED );
 		}
-		$max_tokens = max( 100, (int) LAGR_Settings::get( 'llm_max_tokens', 900 ) );
 
 		$payload = array(
 			'model'       => $config['model'],
@@ -163,12 +205,94 @@ PROMPT;
 			return null;
 		}
 
+		$faq = array();
+		foreach ( (array) ( $parsed['faq'] ?? array() ) as $item ) {
+			$q = is_array( $item ) ? sanitize_text_field( (string) ( $item['question'] ?? '' ) ) : '';
+			$a = is_array( $item ) ? sanitize_textarea_field( (string) ( $item['answer'] ?? '' ) ) : '';
+			if ( '' !== $q && '' !== $a ) {
+				$faq[] = array(
+					'question' => $q,
+					'answer'   => $a,
+				);
+			}
+		}
+
+		$lead      = sanitize_textarea_field( (string) ( $parsed['lead'] ?? '' ) );
+		$features  = self::clean_list( $parsed['features'] ?? array(), 6 );
+		$use_cases = self::clean_list( $parsed['use_cases'] ?? array(), 5 );
+		$body      = wp_kses_post( wpautop( (string) $parsed['full_description'] ) );
+
 		return array(
 			'short_description' => sanitize_text_field( $parsed['short_description'] ),
-			'full_description'  => wp_kses_post( wpautop( $parsed['full_description'] ) ),
-			'tags'               => array_map( 'sanitize_text_field', $parsed['tags'] ?? array() ),
+			'full_description'  => self::compose_description_html( $lead, $features, $use_cases, $body ),
+			'meta_title'        => sanitize_text_field( (string) ( $parsed['meta_title'] ?? '' ) ),
+			'meta_description'  => sanitize_text_field( (string) ( $parsed['meta_description'] ?? '' ) ),
+			'tasks_answer'      => sanitize_textarea_field( (string) ( $parsed['tasks_answer'] ?? '' ) ),
+			'faq'               => array_slice( $faq, 0, 3 ),
+			'tags'               => array_map( 'sanitize_text_field', (array) ( $parsed['tags'] ?? array() ) ),
 			'install_command'   => sanitize_text_field( $parsed['install_command'] ?? '' ),
 		);
+	}
+
+	/**
+	 * The prompt actually sent: the saved one, unless it is empty or still the
+	 * previous built-in text (see LEGACY_SYSTEM_PROMPT) — then the current
+	 * built-in. Compared with whitespace collapsed, because the settings form
+	 * round-trips it through sanitize_textarea_field().
+	 */
+	public static function active_system_prompt() {
+		$saved = trim( (string) LAGR_Settings::get( 'llm_system_prompt', '' ) );
+		if ( '' === $saved || self::normalize_ws( $saved ) === self::normalize_ws( self::LEGACY_SYSTEM_PROMPT ) ) {
+			return self::DEFAULT_SYSTEM_PROMPT;
+		}
+		return $saved;
+	}
+
+	private static function normalize_ws( $s ) {
+		return trim( preg_replace( '/\s+/u', ' ', (string) $s ) );
+	}
+
+	/** Non-empty, sanitized, de-duplicated strings, at most $max of them. */
+	private static function clean_list( $items, $max ) {
+		$out = array();
+		foreach ( (array) $items as $item ) {
+			$item = is_scalar( $item ) ? sanitize_text_field( (string) $item ) : '';
+			if ( '' !== $item && ! in_array( $item, $out, true ) ) {
+				$out[] = $item;
+			}
+		}
+		return array_slice( $out, 0, $max );
+	}
+
+	/**
+	 * The "Описание" tab as one editable HTML string: lead → features →
+	 * use cases → prose. Sections the model didn't return are skipped, so a
+	 * custom prompt with only full_description still yields plain paragraphs.
+	 * H2 because the page title is the only H1.
+	 */
+	public static function compose_description_html( $lead, array $features, array $use_cases, $body_html ) {
+		$html = '';
+		if ( '' !== $lead ) {
+			$html .= '<p class="lagr-lead">' . esc_html( $lead ) . '</p>';
+		}
+		$sections = array(
+			'Ключевые возможности'      => $features,
+			'Для каких задач подходит' => $use_cases,
+		);
+		foreach ( $sections as $heading => $items ) {
+			if ( empty( $items ) ) {
+				continue;
+			}
+			$html .= '<h2>' . esc_html( $heading ) . '</h2><ul>';
+			foreach ( $items as $item ) {
+				$html .= '<li>' . esc_html( $item ) . '</li>';
+			}
+			$html .= '</ul>';
+		}
+		if ( '' !== trim( $body_html ) ) {
+			$html .= ( '' !== $html ? '<h2>Подробнее</h2>' : '' ) . $body_html;
+		}
+		return $html;
 	}
 
 	private function build_user_prompt( array $repo ) {

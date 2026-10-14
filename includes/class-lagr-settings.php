@@ -36,7 +36,7 @@ class LAGR_Settings {
 			// Description-generation tuning (all editable in the admin). The prompt
 			// field is pre-filled with the built-in prompt text (not left blank).
 			'llm_system_prompt'     => class_exists( 'LAGR_LLM_Client' ) ? LAGR_LLM_Client::DEFAULT_SYSTEM_PROMPT : '',
-			'llm_max_tokens'        => 900,   // ceiling on the full description length
+			'llm_max_tokens'        => 2500,  // ceiling on the whole JSON answer (description + FAQ + SEO fields)
 			'llm_short_limit'       => 200,   // hard cap on the short description, chars
 			'llm_readme_chars'      => 3000,  // how much README is fed to the model
 			'yandex_api_key'        => '',

@@ -456,7 +456,7 @@
 	opacity: 0.5;
 }
 
-/* "Установка" tab — clone command + copy button. */
+/* Install command + copy button (the FAQ's "Как установить" answer). */
 .lagr-install-hint {
 	margin: 0 0 8px;
 	font-size: 0.875rem;
@@ -579,20 +579,17 @@
 	display: block;
 }
 .lagr-tabin-desc:checked ~ .lagr-tabnav .lagr-tab-desc,
-.lagr-tabin-readme:checked ~ .lagr-tabnav .lagr-tab-readme,
-.lagr-tabin-install:checked ~ .lagr-tabnav .lagr-tab-install {
+.lagr-tabin-readme:checked ~ .lagr-tabnav .lagr-tab-readme {
 	color: var(--wp--preset--color--accent, #2f5d4f);
 	border-bottom-color: var(--wp--preset--color--accent, #2f5d4f);
 }
 .lagr-tabin-desc:checked ~ .lagr-panel-desc,
-.lagr-tabin-readme:checked ~ .lagr-panel-readme,
-.lagr-tabin-install:checked ~ .lagr-panel-install {
+.lagr-tabin-readme:checked ~ .lagr-panel-readme {
 	display: block;
 }
 /* Keyboard focus ring on the label of whichever radio is focused. */
 .lagr-tabin-desc:focus-visible ~ .lagr-tabnav .lagr-tab-desc,
-.lagr-tabin-readme:focus-visible ~ .lagr-tabnav .lagr-tab-readme,
-.lagr-tabin-install:focus-visible ~ .lagr-tabnav .lagr-tab-install {
+.lagr-tabin-readme:focus-visible ~ .lagr-tabnav .lagr-tab-readme {
 	outline: 2px solid var(--wp--preset--color--accent, #2f5d4f);
 	outline-offset: 2px;
 	border-radius: 3px;
@@ -610,4 +607,34 @@
 .lagr-tabpanel img {
 	max-width: 100%;
 	height: auto;
+}
+.lagr-lead {
+	font-size: 1.0625rem;
+	font-weight: 500;
+}
+
+/* "Частые вопросы" under the tabs — always visible (FAQPage markup must
+ * match visible text), styled as a quiet list of question/answer pairs. */
+.lagr-faq {
+	margin-top: 32px;
+	padding-top: 24px;
+	border-top: 1px solid var(--wp--preset--color--light, #e3e2dd);
+}
+.lagr-faq-title {
+	margin-top: 0;
+	font-size: 1.375rem;
+}
+.lagr-faq-item + .lagr-faq-item {
+	margin-top: 20px;
+}
+.lagr-faq-q {
+	margin: 0 0 6px;
+	font-size: 1rem;
+	font-weight: 600;
+}
+.lagr-faq-a > :first-child {
+	margin-top: 0;
+}
+.lagr-faq-a > :last-child {
+	margin-bottom: 0;
 }

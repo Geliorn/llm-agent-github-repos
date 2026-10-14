@@ -236,8 +236,14 @@ class LAGR_Collector {
 		update_post_meta( $post_id, '_gh_readme_html_tr', $readme_html_tr );
 		update_post_meta( $post_id, '_gh_generated_html', $generated_html );
 		update_post_meta( $post_id, 'install_command', $install_command );
+		self::store_faq( $post_id, $llm_result );
 
-		LAGR_SEO::apply_meta_description( $post_id, $short_description );
+		LAGR_SEO::apply_meta(
+			$post_id,
+			$short_description,
+			$llm_result['meta_title'] ?? '',
+			$llm_result['meta_description'] ?? ''
+		);
 
 		if ( LAGR_Settings::get( 'optional_contributors' ) ) {
 			$count = $client->get_contributors_count( $full_name );
@@ -289,6 +295,91 @@ class LAGR_Collector {
 		}
 
 		return $post_id;
+	}
+
+	/** FAQ inputs for LAGR_FAQ: the "Какие задачи решает" answer and the 3 LLM questions. */
+	private static function store_faq( $post_id, $llm_result ) {
+		update_post_meta( $post_id, '_gh_faq_tasks', $llm_result['tasks_answer'] ?? '' );
+		update_post_meta(
+			$post_id,
+			'_gh_faq_json',
+			! empty( $llm_result['faq'] ) ? wp_json_encode( $llm_result['faq'], JSON_UNESCAPED_UNICODE ) : ''
+		);
+	}
+
+	/**
+	 * Re-run description generation for an already collected repo — brings
+	 * cards made before the structured prompt up to date (lead, features,
+	 * use cases, FAQ, SEO meta). Refetches the README (one GitHub request).
+	 *
+	 * Overwrites only machine-made text: the generated description, the FAQ
+	 * and the SEO fields. short_description and install_command are kept when
+	 * already set — an editor may have fixed them by hand.
+	 *
+	 * @return array{ok:bool, msg:string}
+	 */
+	public static function regenerate_description( $post_id, LAGR_GitHub_Client $client ) {
+		$full_name = (string) get_post_meta( $post_id, '_gh_full_name', true );
+		if ( '' === $full_name ) {
+			return array(
+				'ok'  => false,
+				'msg' => 'нет _gh_full_name',
+			);
+		}
+
+		$topics = array();
+		foreach ( array( 'repo_topic', 'post_tag' ) as $tax ) {
+			$terms = taxonomy_exists( $tax ) ? get_the_terms( $post_id, $tax ) : false;
+			if ( $terms && ! is_wp_error( $terms ) ) {
+				$topics = array_merge( $topics, wp_list_pluck( $terms, 'name' ) );
+			}
+		}
+
+		$llm    = new LAGR_LLM_Client();
+		$result = $llm->generate_descriptions(
+			array(
+				'full_name'   => $full_name,
+				'stars'       => (int) get_post_meta( $post_id, '_gh_stars', true ),
+				'forks'       => (int) get_post_meta( $post_id, '_gh_forks', true ),
+				'language'    => (string) get_post_meta( $post_id, '_gh_language', true ),
+				'license'     => (string) get_post_meta( $post_id, '_gh_license', true ),
+				'homepage'    => (string) get_post_meta( $post_id, '_gh_homepage', true ),
+				'description' => (string) get_post_meta( $post_id, '_gh_source_description', true ),
+				'topics'      => array_values( array_unique( $topics ) ),
+				'readme'      => $client->get_readme( $full_name ),
+			)
+		);
+		if ( ! $result ) {
+			return array(
+				'ok'  => false,
+				'msg' => 'LLM не вернул разбираемый JSON',
+			);
+		}
+
+		$short = trim( (string) get_post_meta( $post_id, 'short_description', true ) );
+		if ( '' === $short ) {
+			$short = mb_substr( $result['short_description'], 0, max( 1, (int) LAGR_Settings::get( 'llm_short_limit', 200 ) ) );
+			update_post_meta( $post_id, 'short_description', $short );
+		}
+		if ( '' === trim( (string) get_post_meta( $post_id, 'install_command', true ) ) && '' !== $result['install_command'] ) {
+			update_post_meta( $post_id, 'install_command', $result['install_command'] );
+		}
+
+		update_post_meta( $post_id, '_gh_generated_html', $result['full_description'] );
+		update_post_meta( $post_id, '_gh_generated_by_llm', 1 );
+		self::store_faq( $post_id, $result );
+		wp_update_post(
+			array(
+				'ID'           => $post_id,
+				'post_content' => $result['full_description'],
+			)
+		);
+		LAGR_SEO::apply_meta( $post_id, $short, $result['meta_title'], $result['meta_description'] );
+
+		return array(
+			'ok'  => true,
+			'msg' => sprintf( 'описание обновлено, вопросов FAQ от LLM: %d', count( $result['faq'] ) ),
+		);
 	}
 
 	private static function first_readme_line( $readme ) {

@@ -1,6 +1,6 @@
 # GitHub Repo Collector (llm-agent-github-repos)
 
-Версия 0.3.0 · Самодостаточный WordPress-плагин: собирает подборки GitHub-репозиториев по настраиваемым правилам (топики, звёзды, свежесть) и публикует их на сайте карточками. Не зависит от ACF/CPT UI и вообще от каких-либо других плагинов — переносим на любой сайт копированием папки.
+Версия 0.8.0 · Самодостаточный WordPress-плагин: собирает подборки GitHub-репозиториев по настраиваемым правилам (топики, звёзды, свежесть) и публикует их на сайте карточками. Не зависит от ACF/CPT UI и вообще от каких-либо других плагинов — переносим на любой сайт копированием папки.
 
 Проектный план и обоснование решений — `docs/github-repo-parser-plan.md` в корне репозитория. Этот файл — справочник по тому, что реально реализовано в коде.
 
@@ -143,7 +143,22 @@
 
 Выключено по умолчанию (`llm_enabled = false`) — тогда `short_description` = обрезанное description репозитория (либо первая строка README), `full_description`/`post_content` = README как есть через Markdown-конвертер.
 
-Если включено — один вызов на репозиторий, промпт просит вернуть JSON `{short_description, full_description, tags}` (см. `LAGR_LLM_Client::SYSTEM_PROMPT`). Разбор ответа терпим к обёртке в \`\`\`json (модели иногда так делают вопреки инструкции).
+Если включено — один вызов на репозиторий, промпт (`LAGR_LLM_Client::DEFAULT_SYSTEM_PROMPT`) просит вернуть JSON:
+
+| Поле | Куда идёт |
+|---|---|
+| `short_description` | мета `short_description` (анонс в карточке и шапке страницы) |
+| `lead`, `features`, `use_cases`, `full_description` | вкладка «Описание» (`_gh_generated_html`): лид → «Ключевые возможности» → «Для каких задач подходит» → «Подробнее» |
+| `tasks_answer` | FAQ «Какие задачи решает X?» (`_gh_faq_tasks`, правится в метабоксе) |
+| `faq` (3 вопроса) | FAQ, `_gh_faq_json` |
+| `meta_title`, `meta_description` | поля SEO-плагина (раздел 8д) |
+| `tags`, `install_command` | таксономия «остальных топиков»; FAQ «Как установить X?» |
+
+Обязательны только `short_description` и `full_description` — со своим промтом без новых полей карточка просто беднее (без списков и сгенерированных вопросов), а не ломается. Разбор ответа терпим к обёртке в \`\`\`json (модели иногда так делают вопреки инструкции).
+
+**Обновление промта на уже настроенных сайтах.** Поле «Промт генерации» предзаполняется встроенным текстом и сохраняется в опцию как есть, поэтому на сайте, где хоть раз нажали «Сохранить», лежит старый встроенный промт. `LAGR_LLM_Client::active_system_prompt()` распознаёт его (сравнение с `LEGACY_SYSTEM_PROMPT` без учёта пробелов) и подставляет новый; свой, отредактированный промт не трогается. Со встроенным промтом `max_tokens` не ниже 2500 — ответ вдвое длиннее прежнего, а обрезанный JSON не разбирается.
+
+**Уже собранные карточки** обновляет `wp github-repos regenerate [--post=<id>] [--missing] [--limit=<n>]`: заново читает README и перегенерирует описание, FAQ и SEO-поля. `short_description` и `install_command`, если уже заполнены (могли быть поправлены руками), не перезаписываются.
 
 **4 провайдера**, все — один HTTP-клиент с разными пресетами (`LAGR_Settings::llm_provider_config()`), потому что все четыре — OpenAI-совместимый `chat/completions`:
 
@@ -183,7 +198,7 @@ score = stars + forks × score_forks_weight   (по умолчанию вес 3)
 
 | Настройка | Плагин | Эффект |
 |---|---|---|
-| `seo_plugin` (`yoast`/`rankmath`/`none`) | Yoast SEO или Rank Math | **Подключено к коду.** При создании записи `LAGR_SEO::apply_meta_description()` пишет сгенерированное краткое описание (первые ~30 слов, без тегов) напрямую в meta-поле выбранного плагина: `_yoast_wpseo_metadesc` для Yoast, `rank_math_description` для Rank Math. `none` — ничего не пишет. |
+| `seo_plugin` (`yoast`/`rankmath`/`none`) | Yoast SEO или Rank Math | **Подключено к коду.** При создании записи `LAGR_SEO::apply_meta()` пишет title, description и картинку для соцсетей в поля выбранного плагина (`_yoast_wpseo_title`/`_yoast_wpseo_metadesc`/`_yoast_wpseo_opengraph-image` или `rank_math_*`) — см. раздел 8д. `none` — ничего не пишет. |
 | `integration_ratings` | — (свой код, см. раздел 8г) | **Подключено.** С 0.3.0 больше не про сторонний плагин — гейтит вставку собственного блока `lagr/rating` в карточку и single-страницу (`LAGR_Patterns::ratings_block()`). Выключено — рейтинг просто не попадает в разметку паттерна при регистрации. |
 | `integration_related_posts` | — (свой код, см. раздел 8г) | **Подключено.** С 0.3.0 больше не про сторонний плагин — гейтит вставку собственного блока `lagr/related-posts` на single-странице (`LAGR_Patterns::related_posts_block()`). |
 | `integration_filter_everything` | Filter Everything | **НЕ подключено, всё ещё вручную.** Боковая колонка с `[fe_widget]` вшита напрямую во все 4 архивных шаблона в `install-templates.php`, без проверки этого флага. На сайте без Filter Everything это даст пустую колонку с нерабочим шорткодом; при переносе на другой сайт сети — либо ставить и настраивать Filter Everything так же (раздел 8в), либо убрать колонку из шаблона. |
@@ -283,6 +298,25 @@ score = stars + forks × score_forks_weight   (по умолчанию вес 3)
 
 ---
 
+## 8д. FAQ, микроразметка и мета-теги (`class-lagr-faq.php`, `class-lagr-schema.php`, `class-lagr-seo.php`) — с версии 0.8.0
+
+**FAQ — 5 вопросов**, собираются при выводе (`LAGR_FAQ::items()`):
+
+1. «Как установить X?» — команда из `install_command` с кнопкой «Копировать»; если её нет — `git clone`. Отдельной вкладки «Установка» больше нет.
+2. «Какие задачи решает X?» — `_gh_faq_tasks`, для старых карточек — `short_description`.
+3–5. Три вопроса, которые написала модель (`_gh_faq_json`).
+
+Выводится блоком `lagr/repo-content` **под вкладками, а не во вкладке**: размеченные вопросы и ответы должны быть видны на странице. Блок динамический, поэтому FAQ появляется в уже установленном шаблоне `single-github_repo` без переустановки.
+
+**JSON-LD.** Один источник вопросов для страницы и разметки — текст совпадает дословно.
+
+- С Yoast (`WPSEO_VERSION`): узлы добавляются в граф Yoast через `wpseo_schema_graph`, а не вторым `<script>`. WebPage получает тип `FAQPage` и `mainEntity` → узлы `Question` (так же делает FAQ-блок самого Yoast) и `about` → узел `SoftwareSourceCode` (репозиторий: `codeRepository`, язык, лицензия SPDX, автор, даты, версия релиза, ключевые слова). Цепочка крошек Yoast (`wpseo_breadcrumb_links`) выровнена с видимой: Главная → Каталог → тема → репозиторий.
+- Без Yoast: собственный `<script type="application/ld+json">` в `wp_head` с SoftwareSourceCode, WebPage/FAQPage и BreadcrumbList.
+
+**Мета-теги** (`LAGR_SEO::apply_meta()`, по настройке `seo_plugin`): title из `meta_title`, description из `meta_description` (без LLM — первые ~30 слов анонса), картинка для соцсетей — карточка GitHub `https://opengraph.githubassets.com/1/{owner}/{repo}`, если у записи нет миниатюры. Сами теги `og:`/`twitter:` и `canonical` печатает SEO-плагин из этих полей.
+
+---
+
 ## 9. WP-CLI (`class-lagr-cli.php`)
 
 Регистрируется только если запущено под WP-CLI (`defined('WP_CLI') && WP_CLI`), не обязательно для работы плагина — альтернатива для сайтов, где есть SSH:
@@ -291,6 +325,7 @@ score = stars + forks × score_forks_weight   (по умолчанию вес 3)
 wp github-repos tick                 # прогнать тик (то же, что cron)
 wp github-repos run --rule=<id>      # запустить конкретное правило прямо сейчас, игнорируя интервал
 wp github-repos list-rules           # таблица всех правил: ID, включено, интервал, последний запуск
+wp github-repos regenerate [--post=<id>] [--missing] [--limit=<n>]   # перегенерировать описание, FAQ и SEO-поля
 ```
 
 **Важно для этого сервера (Beget):** команда `wp` — shell-обёртка с зашитым путём на PHP 7.4, не сам `.phar`. Для действий, чувствительных к версии PHP (например, установка стороннего плагина с `Requires PHP` выше 7.4), вызывать `.phar` напрямую: `php8.3 /usr/local/bin/wp-cli.phar ...` — `WP_CLI_PHP=... wp ...` не всегда это перекрывает (проверено эмпирически). См. `docs/stack-decisions.md`.

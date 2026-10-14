@@ -4,10 +4,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Repo text as tabs — the LLM-generated description, the GitHub README and an
- * "Установка" tab with a copy-able clone command. CSS-only disclosure (hidden
- * radio inputs drive the panels, see .lagr-tabs in patterns.css); only the
- * copy button needs JS (view.js), and it degrades to a selectable command.
+ * Repo text as tabs — the LLM-generated description and the GitHub README —
+ * followed by an always-visible FAQ section (LAGR_FAQ), whose first answer
+ * carries the copy-able install command. CSS-only disclosure (hidden radio
+ * inputs drive the panels, see .lagr-tabs in patterns.css); only the copy
+ * button needs JS (view.js), and it degrades to a selectable command.
+ *
+ * The FAQ sits outside the tabs on purpose: it is marked up as FAQPage
+ * (LAGR_Schema), and the marked-up answers must be visible on the page.
  */
 
 $post_id = get_the_ID();
@@ -32,15 +36,6 @@ if ( '' === $readme && '' === $generated ) {
 	$readme = trim( (string) get_post_field( 'post_content', $post_id ) );
 }
 
-// Prefer an explicit install command (LLM-extracted from the README, or set
-// by an editor); fall back to a generic clone, which is valid for any repo.
-$full       = (string) get_post_meta( $post_id, '_gh_full_name', true );
-$install    = trim( (string) get_post_meta( $post_id, 'install_command', true ) );
-$is_clone   = '' === $install;
-if ( $is_clone && '' !== $full ) {
-	$install = 'git clone https://github.com/' . $full . '.git';
-}
-
 $tabs = array();
 
 // Описание — always present; a muted placeholder until an LLM description exists.
@@ -56,20 +51,6 @@ if ( '' !== $readme ) {
 		// Sanitize with the README allowlist (keeps code/tables/task-lists),
 		// not wp_kses_post which would strip those extras.
 		'html'  => LAGR_Collector::sanitize_readme_html( $readme ),
-		'has'   => true,
-	);
-}
-
-if ( '' !== $install ) {
-	$hint         = $is_clone ? 'Клонировать репозиторий:' : 'Установка:';
-	$install_html = '<div class="lagr-install">'
-		. '<p class="lagr-install-hint">' . esc_html( $hint ) . '</p>'
-		. '<div class="lagr-install-cmd"><code>' . esc_html( $install ) . '</code>'
-		. '<button type="button" class="lagr-copy" data-copy="' . esc_attr( $install ) . '">Копировать</button></div>'
-		. '</div>';
-	$tabs['install'] = array(
-		'label' => 'Установка',
-		'html'  => $install_html,
 		'has'   => true,
 	);
 }
@@ -103,5 +84,18 @@ foreach ( $tabs as $id => $tab ) {
 	$panels  .= '<div class="lagr-tabpanel lagr-panel-' . esc_attr( $id ) . '">' . $tab['html'] . '</div>';
 }
 
-// phpcs:ignore WordPress.Security.EscapeOutput -- wrapper pre-escaped; tab labels/ids escaped above; panel HTML is wp_kses_post'd or our own trusted markup.
-echo '<div ' . $wrapper . '>' . $radios . '<div class="lagr-tabnav" role="tablist">' . $nav . '</div>' . $panels . '</div>';
+$faq_html = '';
+$faq      = LAGR_FAQ::items( $post_id );
+if ( ! empty( $faq ) ) {
+	$faq_html = '<section class="lagr-faq" aria-labelledby="' . esc_attr( $uid ) . '-faq">'
+		. '<h2 id="' . esc_attr( $uid ) . '-faq" class="lagr-faq-title">Частые вопросы</h2>';
+	foreach ( $faq as $i => $item ) {
+		// #faq-N — the Question nodes in LAGR_Schema link to these anchors.
+		$faq_html .= '<div class="lagr-faq-item" id="faq-' . ( $i + 1 ) . '"><h3 class="lagr-faq-q">' . esc_html( $item['question'] ) . '</h3>'
+			. '<div class="lagr-faq-a">' . $item['answer_html'] . '</div></div>';
+	}
+	$faq_html .= '</section>';
+}
+
+// phpcs:ignore WordPress.Security.EscapeOutput -- wrapper pre-escaped; tab labels/ids escaped above; panel HTML is wp_kses_post'd or our own trusted markup; FAQ answers are escaped in LAGR_FAQ.
+echo '<div ' . $wrapper . '>' . $radios . '<div class="lagr-tabnav" role="tablist">' . $nav . '</div>' . $panels . $faq_html . '</div>';

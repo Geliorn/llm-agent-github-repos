@@ -2,7 +2,7 @@
 /**
  * Plugin Name: GitHub Repo Collector
  * Description: Универсальный сборщик подборок GitHub-репозиториев по настраиваемым правилам (топики, звёзды, свежесть), с публикацией карточек на сайте. Самодостаточен — сам регистрирует тип записи и поля, не зависит от ACF/CPT UI.
- * Version: 0.7.1
+ * Version: 0.8.0
  * Author: llm-agent.ru
  * Text Domain: lagr
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'LAGR_VERSION', '0.7.1' );
+define( 'LAGR_VERSION', '0.8.0' );
 define( 'LAGR_PLUGIN_FILE', __FILE__ );
 define( 'LAGR_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LAGR_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -25,6 +25,8 @@ require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-llm-client.php';
 require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-translate.php';
 require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-query-builder.php';
 require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-seo.php';
+require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-faq.php';
+require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-schema.php';
 require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-collector.php';
 require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-scheduler.php';
 require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-admin.php';
@@ -53,6 +55,7 @@ function lagr_boot() {
 	LAGR_Blocks::init();
 	LAGR_Patterns::init();
 	LAGR_Filters::init();
+	LAGR_Schema::init();
 }
 add_action( 'plugins_loaded', 'lagr_boot' );
 

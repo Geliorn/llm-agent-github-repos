@@ -1,6 +1,6 @@
 /**
- * Copy-to-clipboard for the "Установка" tab's clone command. Delegated click
- * so it covers any .lagr-copy on the page. Tries the async Clipboard API, then
+ * Copy-to-clipboard for the install command in the FAQ's "Как установить"
+ * answer. Delegated click so it covers any .lagr-copy on the page. Tries the async Clipboard API, then
  * falls back to a temporary textarea + execCommand for contexts where the
  * Clipboard API is blocked; degrades to a selectable <code> if both fail.
  */
