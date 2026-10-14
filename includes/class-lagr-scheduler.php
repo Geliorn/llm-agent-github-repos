@@ -141,6 +141,9 @@ class LAGR_Scheduler {
 
 				LAGR_Collector::run_rule( $rule_id );
 			}
+
+			// Weekly vocabulary regulator — guarded inside, no second cron.
+			LAGR_Tag_Regulator::maybe_run();
 		} finally {
 			delete_transient( self::TICK_RUNNING_TRANSIENT );
 		}

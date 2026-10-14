@@ -284,7 +284,7 @@ class LAGR_Admin {
 									<option value="<?php echo esc_attr( $tax->name ); ?>" <?php selected( $s['extra_topics_taxonomy'], $tax->name ); ?>><?php echo esc_html( $tax->labels->name . ' (' . $tax->name . ')' ); ?></option>
 								<?php endforeach; ?>
 							</select>
-							<p class="description">Топик(и), указанные в самом правиле сбора, всегда попадают в <code>repo_topic</code> — это курируемый словарь. Здесь решаете, куда девать остальные родные топики репозитория с GitHub (плюс теги от LLM, если она включена): в общие теги сайта, туда же в <code>repo_topic</code>, в любую другую зарегистрированную таксономию, или не добавлять вовсе.</p>
+							<p class="description">Топик(и), указанные в самом правиле сбора, всегда попадают в <code>repo_topic</code> — это курируемый словарь. Здесь решаете, куда девать остальные родные топики репозитория с GitHub (плюс теги от LLM, если она включена): в общие теги сайта, туда же в <code>repo_topic</code>, в любую другую зарегистрированную таксономию, или не добавлять вовсе. При <code>post_tag</code> топики проходят через «Словарь задач»: алиасы → утверждённые метки, неизвестное — скрытые кандидаты.</p>
 						</td>
 					</tr>
 				</table>
@@ -331,7 +331,7 @@ class LAGR_Admin {
 				<table class="form-table">
 					<tr><th>Промт генерации</th><td>
 						<textarea name="llm_system_prompt" rows="14" style="width:100%;max-width:820px;font-family:monospace"><?php echo esc_textarea( '' !== $s['llm_system_prompt'] ? $s['llm_system_prompt'] : LAGR_LLM_Client::DEFAULT_SYSTEM_PROMPT ); ?></textarea>
-						<p class="description">Активный системный промт для генерации описаний (предзаполнен базовым — редактируйте под себя). Модель должна возвращать <strong>строго JSON</strong> с полями <code>short_description</code>, <code>full_description</code> (и <code>tags</code>, <code>install_command</code>).</p>
+						<p class="description">Активный системный промт для генерации описаний (предзаполнен базовым — редактируйте под себя). Модель должна возвращать <strong>строго JSON</strong> с полями <code>short_description</code>, <code>full_description</code> (и <code>install_command</code>). Блок словаря задач с правилами для <code>tags</code> / <code>mapped</code> / <code>proposed</code> дописывается к промту автоматически — см. «Словарь задач».</p>
 					</td></tr>
 					<tr><th>Длина полного описания (max_tokens)</th><td><input type="number" name="llm_max_tokens" value="<?php echo esc_attr( $s['llm_max_tokens'] ); ?>" min="100" step="50" style="width:120px"> <span class="description">потолок длины full_description (900 ≈ 2–4 абзаца). Слишком малое значение обрежет JSON-ответ и генерация не пройдёт — рекомендуется ≥ 700.</span></td></tr>
 					<tr><th>Лимит короткого описания, символов</th><td><input type="number" name="llm_short_limit" value="<?php echo esc_attr( $s['llm_short_limit'] ); ?>" min="1" step="10" style="width:120px"> <span class="description">жёсткая обрезка short_description</span></td></tr>

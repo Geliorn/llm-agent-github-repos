@@ -19,7 +19,6 @@ class LAGR_LLM_Client {
 {
   "short_description": "1-2 предложения, до 200 символов, что это и для кого",
   "full_description": "2-4 связных абзаца без заголовков и без маркированных списков — что за инструмент, чем отличается от аналогов, когда пригодится",
-  "tags": ["1-3 свободных тега по смыслу/назначению, на русском или английском — как уместнее"],
   "install_command": "одна строка — основная команда установки/запуска из README (например npx -y ..., pip install ..., npm i ..., docker run ...); если в README её явно нет — пустая строка"
 }
 
@@ -27,7 +26,6 @@ class LAGR_LLM_Client {
 — Без эмодзи, без штампов («уникальный», «революционный», «мощный», «легко», «просто»)
 — Не придумывай цифры, факты и примеры, которых нет в предоставленных данных
 — full_description пиши как будто объясняешь коллеге, без воды
-— Если авторские topics репозитория уже покрывают суть — tags может быть короче или пустым
 — install_command бери дословно из README (без markdown-разметки и без комментариев); если явной команды нет — оставь пустую строку, не придумывай
 — Язык: русский
 PROMPT;
@@ -124,7 +122,11 @@ PROMPT;
 		return $s;
 	}
 
-	public function generate_descriptions( array $repo ) {
+	/**
+	 * @param array      $repo       Repo data (see LAGR_Collector::create_repo_post()).
+	 * @param array|null $unresolved Topics step 1 couldn't map; null = don't ask for tags at all.
+	 */
+	public function generate_descriptions( array $repo, $unresolved = null ) {
 		$provider = LAGR_Settings::get( 'llm_provider', 'deepseek' );
 		$config   = LAGR_Settings::llm_provider_config( $provider );
 
@@ -135,7 +137,11 @@ PROMPT;
 		if ( '' === $system_prompt ) {
 			$system_prompt = self::DEFAULT_SYSTEM_PROMPT;
 		}
-		$max_tokens = max( 100, (int) LAGR_Settings::get( 'llm_max_tokens', 900 ) );
+		// The task vocabulary is appended to whatever prompt is active — the
+		// admin's own prompt keeps working, tags follow the vocabulary rules.
+		$vocabulary = null !== $unresolved ? LAGR_Vocabulary::prompt_block( (array) $unresolved ) : '';
+		$system_prompt .= $vocabulary;
+		$max_tokens = max( 100, (int) LAGR_Settings::get( 'llm_max_tokens', 900 ) ) + ( '' !== $vocabulary ? 250 : 0 );
 
 		$payload = array(
 			'model'       => $config['model'],
@@ -166,9 +172,47 @@ PROMPT;
 		return array(
 			'short_description' => sanitize_text_field( $parsed['short_description'] ),
 			'full_description'  => wp_kses_post( wpautop( $parsed['full_description'] ) ),
-			'tags'               => array_map( 'sanitize_text_field', $parsed['tags'] ?? array() ),
+			// {tags, mapped, proposed} — validated against the vocabulary in LAGR_Vocabulary::assign().
+			'tag_block'         => '' !== $vocabulary ? LAGR_Vocabulary::llm_block_from( $parsed ) : null,
 			'install_command'   => sanitize_text_field( $parsed['install_command'] ?? '' ),
+			'model'             => $config['model'],
 		);
+	}
+
+	/**
+	 * Tags only — for records whose description already exists (CLI re-tagging).
+	 * Returns the parsed {tags, mapped, proposed} block or null.
+	 */
+	public function classify_tags( array $repo, array $unresolved ) {
+		$provider = LAGR_Settings::get( 'llm_provider', 'deepseek' );
+		$config   = LAGR_Settings::llm_provider_config( $provider );
+		$block    = LAGR_Vocabulary::prompt_block( $unresolved );
+		if ( '' === $block ) {
+			return null;
+		}
+		$system = "Ты размечаешь карточку каталога тегами задач. Верни СТРОГО JSON-объект (без markdown-обёртки) только с полями tags, mapped, proposed." . $block;
+
+		$content = $this->call(
+			$config,
+			array(
+				'model'       => $config['model'],
+				'max_tokens'  => 400,
+				'temperature' => 0.2,
+				'messages'    => array(
+					array(
+						'role'    => 'system',
+						'content' => $system,
+					),
+					array(
+						'role'    => 'user',
+						'content' => $this->build_user_prompt( $repo ),
+					),
+				),
+			),
+			1
+		);
+		$parsed = $content ? $this->extract_json( $content ) : null;
+		return $parsed ? LAGR_Vocabulary::llm_block_from( $parsed ) : null;
 	}
 
 	private function build_user_prompt( array $repo ) {

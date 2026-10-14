@@ -145,4 +145,205 @@ class LAGR_CLI {
 	}
 }
 
+/**
+ * Task vocabulary (post_tag): seed, migration, regulator, queue operations.
+ * `wp github-repos tags <command>`.
+ */
+class LAGR_Tags_CLI {
+
+	public static function register() {
+		WP_CLI::add_command( 'github-repos tags', __CLASS__ );
+	}
+
+	/**
+	 * Create/update the 84 approved terms from lagr-vocabulary-seed.php. Idempotent.
+	 *
+	 * [--dry-run]
+	 * : Only count.
+	 *
+	 * ## EXAMPLES
+	 *     wp github-repos tags seed
+	 */
+	public function seed( $args, $assoc_args ) {
+		$r = LAGR_Vocabulary::seed( isset( $assoc_args['dry-run'] ) );
+		foreach ( $r['conflicts'] as $c ) {
+			WP_CLI::warning( $c );
+		}
+		WP_CLI::success( sprintf( 'Создано %d, обновлено %d, разделов с алиасами %d.', $r['created'], $r['updated'], $r['sections'] ) );
+	}
+
+	/**
+	 * Migrate the legacy post_tag pile. Dry-run unless --apply.
+	 *
+	 * [--apply]
+	 * : Actually do it (irreversible).
+	 *
+	 * [--yes]
+	 * : Skip the confirmation with --apply.
+	 *
+	 * ## EXAMPLES
+	 *     wp github-repos tags migrate
+	 *     wp github-repos tags migrate --apply
+	 */
+	public function migrate( $args, $assoc_args ) {
+		$apply = isset( $assoc_args['apply'] );
+		if ( $apply ) {
+			WP_CLI::confirm( 'Миграция необратима. Применить?', $assoc_args );
+		}
+		$r = $apply ? LAGR_Tag_Migrate::apply() : LAGR_Tag_Migrate::plan();
+		if ( is_wp_error( $r ) ) {
+			WP_CLI::error( $r->get_error_message() );
+		}
+		$items = array();
+		foreach ( LAGR_Tag_Migrate::report_rows( $r ) as $label => $b ) {
+			$items[] = array(
+				'what'     => $label,
+				'terms'    => $b['terms'],
+				'records'  => $b['records'],
+				'examples' => implode( ', ', array_slice( $b['examples'], 0, 6 ) ),
+			);
+		}
+		WP_CLI::log( sprintf( 'Старых меток без статуса: %d', $r['legacy_total'] ) );
+		WP_CLI\Utils\format_items( 'table', $items, array( 'what', 'terms', 'records', 'examples' ) );
+		WP_CLI::log( sprintf( 'Словарь: создать/создано %d, обновить/обновлено %d', $r['seed']['created'] ?? 0, $r['seed']['updated'] ?? 0 ) );
+		foreach ( array_merge( (array) ( $r['seed']['conflicts'] ?? array() ), $r['errors'] ) as $e ) {
+			WP_CLI::warning( $e );
+		}
+		$apply ? WP_CLI::success( 'Миграция применена, регулятор включён.' ) : WP_CLI::success( 'Dry-run. Применить: --apply' );
+	}
+
+	/**
+	 * Run the weekly regulator now, ignoring the weekly guard.
+	 *
+	 * ## EXAMPLES
+	 *     wp github-repos tags regulate
+	 */
+	public function regulate( $args, $assoc_args ) {
+		delete_transient( LAGR_Tag_Regulator::COOC_TRANSIENT );
+		update_option( LAGR_Tag_Regulator::LAST_RUN_OPTION, time(), false );
+		WP_CLI::success( LAGR_Tag_Regulator::summary_text( LAGR_Tag_Regulator::run() ) );
+	}
+
+	/**
+	 * Re-tag existing records through the vocabulary: their current post_tag
+	 * names (and repo topics) go through step 1; with --llm unresolved ones
+	 * are shown to the model.
+	 *
+	 * [<id>...]
+	 * : Post IDs. Default: all github_repo posts.
+	 *
+	 * [--llm]
+	 * : Ask the model about strings step 1 couldn't map.
+	 *
+	 * [--limit=<n>]
+	 * : At most N posts.
+	 *
+	 * ## EXAMPLES
+	 *     wp github-repos tags resolve 123 456 --llm
+	 */
+	public function resolve( $args, $assoc_args ) {
+		$ids = array_map( 'intval', $args );
+		if ( ! $ids ) {
+			$ids = get_posts(
+				array(
+					'post_type'      => 'github_repo',
+					'post_status'    => 'any',
+					'posts_per_page' => isset( $assoc_args['limit'] ) ? (int) $assoc_args['limit'] : -1,
+					'fields'         => 'ids',
+				)
+			);
+		}
+		$llm = isset( $assoc_args['llm'] ) ? new LAGR_LLM_Client() : null;
+		LAGR_Vocabulary::begin_run();
+		foreach ( $ids as $id ) {
+			$names = wp_get_object_terms( $id, LAGR_Vocabulary::TAXONOMY, array( 'fields' => 'names' ) );
+			$names = is_wp_error( $names ) ? array() : $names;
+			$step1 = LAGR_Vocabulary::resolve( $names, $id );
+			$block = null;
+			if ( $llm && $step1['unresolved'] ) {
+				$block = $llm->classify_tags(
+					array(
+						'full_name'   => get_post_meta( $id, '_gh_full_name', true ) ?: get_the_title( $id ),
+						'description' => get_post_meta( $id, 'short_description', true ),
+						'topics'      => $names,
+						'readme'      => wp_strip_all_tags( get_post_field( 'post_content', $id ) ),
+					),
+					$step1['unresolved']
+				);
+			}
+			$r = LAGR_Vocabulary::assign( $id, $names, $block, array( 'source' => 'cli', 'unresolved_policy' => 'drop' ) );
+			WP_CLI::log( sprintf( '#%d: терминов %d, нераспознано %d, новых кандидатов %d, выучено алиасов %d', $id, count( $r['term_ids'] ), count( $r['unresolved'] ), count( $r['created'] ), count( $r['learned'] ) ) );
+		}
+		WP_CLI::success( sprintf( 'Обработано %d.', count( $ids ) ) );
+	}
+
+	/**
+	 * Approve candidates.
+	 *
+	 * <id>...
+	 * : Term IDs.
+	 */
+	public function approve( $args ) {
+		foreach ( $args as $id ) {
+			$r = LAGR_Tag_Queue::approve( (int) $id );
+			is_wp_error( $r ) ? WP_CLI::warning( "#{$id}: " . $r->get_error_message() ) : WP_CLI::log( "#{$id}: утверждён" );
+		}
+	}
+
+	/**
+	 * Reject candidates (delete + blocklist).
+	 *
+	 * <id>...
+	 * : Term IDs.
+	 */
+	public function reject( $args ) {
+		foreach ( $args as $id ) {
+			$r = LAGR_Tag_Queue::reject( (int) $id );
+			is_wp_error( $r ) ? WP_CLI::warning( "#{$id}: " . $r->get_error_message() ) : WP_CLI::log( "#{$id}: отклонён" );
+		}
+	}
+
+	/**
+	 * Merge terms into an approved target. Shows the preview and asks first.
+	 *
+	 * <target>
+	 * : Target term ID (approved).
+	 *
+	 * <source>...
+	 * : Source term IDs.
+	 *
+	 * [--yes]
+	 * : Skip the confirmation.
+	 */
+	public function merge( $args, $assoc_args ) {
+		$target = (int) array_shift( $args );
+		foreach ( $args as $id ) {
+			$p = LAGR_Tag_Queue::preview( (int) $id, $target );
+			if ( is_wp_error( $p ) ) {
+				WP_CLI::warning( "#{$id}: " . $p->get_error_message() );
+				continue;
+			}
+			WP_CLI::log( sprintf( '«%s» → «%s»: переедет %d, уже несут %d, алиасы +%s, источник: %s', $p['source']->name, $p['target']->name, $p['move'], $p['already'], implode( ', ', $p['aliases'] ) ?: '—', $p['source_after'] ) );
+		}
+		WP_CLI::confirm( 'Склеить?', $assoc_args );
+		$r = LAGR_Tag_Queue::merge_many( $args, $target );
+		foreach ( $r['errors'] as $e ) {
+			WP_CLI::warning( $e );
+		}
+		WP_CLI::success( sprintf( 'Склеено: %d.', $r['done'] ) );
+	}
+
+	/**
+	 * Vocabulary counters.
+	 */
+	public function stats() {
+		$c = LAGR_Vocabulary::counts();
+		WP_CLI::log( sprintf( '%d разделов · %d задач · %d кандидатов · blocklist %d', $c['sections'], $c['approved'], $c['candidates'], count( LAGR_Vocabulary::blocklist() ) ) );
+		foreach ( LAGR_Vocabulary::stats() as $week => $row ) {
+			WP_CLI::log( sprintf( '%s: без модели %d из %d', $week, $row['step1'], $row['total'] ) );
+		}
+	}
+}
+
 LAGR_CLI::register();
+LAGR_Tags_CLI::register();

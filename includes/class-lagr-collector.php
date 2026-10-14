@@ -62,6 +62,8 @@ class LAGR_Collector {
 		$flagged = 0;
 		$skipped = 0;
 
+		LAGR_Vocabulary::begin_run(); // per-run limit on new tag candidates
+
 		foreach ( $search['items'] as $item ) {
 			if ( $require_description && empty( $item['description'] ) ) {
 				++$skipped;
@@ -160,27 +162,33 @@ class LAGR_Collector {
 		$readme_html_tr = ( $collect_readme && LAGR_Translate::enabled() ) ? LAGR_Translate::translate_html( $readme_html ) : '';
 		$readme_html_tr = '' !== $readme_html_tr ? self::sanitize_readme_html( $readme_html_tr ) : '';
 
+		// Tags: with post_tag as the target, the repo's own topics go through the
+		// task vocabulary. Step 1 (aliases, no model) runs first; only what it
+		// couldn't map is shown to the model, together with the vocabulary.
+		$extra_topics_taxonomy = LAGR_Settings::get( 'extra_topics_taxonomy', 'post_tag' );
+		$use_vocabulary        = LAGR_Vocabulary::TAXONOMY === $extra_topics_taxonomy && LAGR_Vocabulary::is_seeded();
+		$raw_topics            = array_values( array_diff( (array) $repo_data['topics'], $rule_topics ) );
+		$step1                 = $use_vocabulary ? LAGR_Vocabulary::resolve( $raw_topics ) : null;
+
 		$generated_by_llm = false;
 		$generated_html   = '';
 		$install_command  = '';
 		$llm_result       = null;
 		if ( (bool) LAGR_Settings::get( 'llm_enabled' ) ) {
 			$llm        = new LAGR_LLM_Client();
-			$llm_result = $llm->generate_descriptions( $repo_data );
+			$llm_result = $llm->generate_descriptions( $repo_data, $step1 ? $step1['unresolved'] : null );
 		}
 
 		$short_limit = max( 1, (int) LAGR_Settings::get( 'llm_short_limit', 200 ) );
 		if ( $llm_result ) {
 			$short_description = $llm_result['short_description'];
 			$generated_html    = $llm_result['full_description'];
-			$extra_tags         = $llm_result['tags'];
 			$install_command    = $llm_result['install_command'] ?? '';
 			$generated_by_llm   = true;
 		} else {
 			$short_description = $repo_data['description']
 				? $repo_data['description']
 				: self::first_readme_line( $readme );
-			$extra_tags         = array();
 		}
 		// Hard cap the short description to the configured limit (safety net — the
 		// prompt also asks for it, but a model can overshoot).
@@ -266,17 +274,23 @@ class LAGR_Collector {
 		}
 
 		// Everything else — the repo's own GitHub topics not already covered by the
-		// rule, plus any LLM-suggested tags — goes wherever the setting points
-		// (post_tag by default; 'repo_topic' re-merges them; 'none' drops them).
-		$extra_topics_taxonomy = LAGR_Settings::get( 'extra_topics_taxonomy', 'post_tag' );
-		if ( 'none' !== $extra_topics_taxonomy && taxonomy_exists( $extra_topics_taxonomy ) ) {
-			$extra_topics = array_values(
-				array_unique(
-					array_filter(
-						array_diff( array_merge( $repo_data['topics'], $extra_tags ), $rule_topics_clean )
-					)
+		// rule — goes wherever the setting points. post_tag (default) means the
+		// task vocabulary: aliases → approved terms, the model's answer validated
+		// in PHP, unknowns as invisible candidates. 'repo_topic'/other taxonomy
+		// keep the old as-is behaviour; 'none' drops them.
+		if ( $use_vocabulary ) {
+			LAGR_Vocabulary::assign(
+				$post_id,
+				$raw_topics,
+				$llm_result['tag_block'] ?? null,
+				array(
+					'source' => 'repo',
+					'model'  => $llm_result['model'] ?? '',
+					'run_id' => $rule_id . '@' . gmdate( 'Y-m-d\TH:i' ),
 				)
 			);
+		} elseif ( 'none' !== $extra_topics_taxonomy && taxonomy_exists( $extra_topics_taxonomy ) ) {
+			$extra_topics = array_values( array_unique( array_filter( array_diff( $repo_data['topics'], $rule_topics_clean ) ) ) );
 			if ( ! empty( $extra_topics ) ) {
 				wp_set_object_terms( $post_id, $extra_topics, $extra_topics_taxonomy, true );
 			}
