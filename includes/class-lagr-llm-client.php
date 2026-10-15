@@ -28,7 +28,6 @@ class LAGR_LLM_Client {
   "faq": [
     {"question": "вопрос, который разработчик реально задал бы в поиске про этот инструмент", "answer": "ответ 1-3 предложения"}
   ],
-  "tags": ["1-3 свободных тега по смыслу/назначению, на русском или английском — как уместнее"],
   "install_command": "одна строка — основная команда установки/запуска из README (например npx -y ..., pip install ..., npm i ..., docker run ...); если в README её явно нет — пустая строка"
 }
 
@@ -37,7 +36,6 @@ class LAGR_LLM_Client {
 — Не придумывай цифры, факты, функции и примеры, которых нет в предоставленных данных
 — full_description пиши как будто объясняешь коллеге, без воды и без повторов из features и use_cases
 — faq — ровно 3 вопроса. НЕ спрашивай про установку и про то, какие задачи решает инструмент (эти вопросы уже есть). Подходящие темы: требования и совместимость, настройка и подключение, лицензия и коммерческое использование, отличие от аналогов, ограничения. Отвечай только тем, что следует из данных; если ответа в данных нет — выбери другой вопрос
-— Если авторские topics репозитория уже покрывают суть — tags может быть короче или пустым
 — install_command бери дословно из README (без markdown-разметки и без комментариев); если явной команды нет — оставь пустую строку, не придумывай
 — Язык: русский
 PROMPT;
@@ -56,7 +54,6 @@ PROMPT;
 {
   "short_description": "1-2 предложения, до 200 символов, что это и для кого",
   "full_description": "2-4 связных абзаца без заголовков и без маркированных списков — что за инструмент, чем отличается от аналогов, когда пригодится",
-  "tags": ["1-3 свободных тега по смыслу/назначению, на русском или английском — как уместнее"],
   "install_command": "одна строка — основная команда установки/запуска из README (например npx -y ..., pip install ..., npm i ..., docker run ...); если в README её явно нет — пустая строка"
 }
 
@@ -64,7 +61,26 @@ PROMPT;
 — Без эмодзи, без штампов («уникальный», «революционный», «мощный», «легко», «просто»)
 — Не придумывай цифры, факты и примеры, которых нет в предоставленных данных
 — full_description пиши как будто объясняешь коллеге, без воды
-— Если авторские topics репозитория уже покрывают суть — tags может быть короче или пустым
+— install_command бери дословно из README (без markdown-разметки и без комментариев); если явной команды нет — оставь пустую строку, не придумывай
+— Язык: русский
+PROMPT;
+
+	/** The same previous prompt as shipped in 0.8.0–0.9.0 — without "tags" (the vocabulary block asks for them). */
+	const LEGACY_SYSTEM_PROMPT_V2 = <<<PROMPT
+Ты пишешь описание GitHub-репозитория для карточки каталога на сайте.
+Аудитория — разработчики, которые выбирают инструмент для своей задачи.
+
+Верни СТРОГО JSON-объект (без markdown-обёртки, без пояснений вокруг) с полями:
+{
+  "short_description": "1-2 предложения, до 200 символов, что это и для кого",
+  "full_description": "2-4 связных абзаца без заголовков и без маркированных списков — что за инструмент, чем отличается от аналогов, когда пригодится",
+  "install_command": "одна строка — основная команда установки/запуска из README (например npx -y ..., pip install ..., npm i ..., docker run ...); если в README её явно нет — пустая строка"
+}
+
+Ограничения:
+— Без эмодзи, без штампов («уникальный», «революционный», «мощный», «легко», «просто»)
+— Не придумывай цифры, факты и примеры, которых нет в предоставленных данных
+— full_description пиши как будто объясняешь коллеге, без воды
 — install_command бери дословно из README (без markdown-разметки и без комментариев); если явной команды нет — оставь пустую строку, не придумывай
 — Язык: русский
 PROMPT;
@@ -164,7 +180,11 @@ PROMPT;
 		return $s;
 	}
 
-	public function generate_descriptions( array $repo ) {
+	/**
+	 * @param array      $repo       Repo data (see LAGR_Collector::create_repo_post()).
+	 * @param array|null $unresolved Topics step 1 couldn't map; null = don't ask for tags at all.
+	 */
+	public function generate_descriptions( array $repo, $unresolved = null ) {
 		$provider = LAGR_Settings::get( 'llm_provider', 'deepseek' );
 		$config   = LAGR_Settings::llm_provider_config( $provider );
 
@@ -178,6 +198,14 @@ PROMPT;
 			// built-in prompt never runs with the old 900-token default.
 			$max_tokens = max( $max_tokens, self::MIN_TOKENS_STRUCTURED );
 		}
+		// The task vocabulary is appended to whatever prompt is active — the
+		// admin's own prompt keeps working, tags follow the vocabulary rules.
+		$vocabulary = null !== $unresolved ? LAGR_Vocabulary::prompt_block( (array) $unresolved ) : '';
+		$system_prompt .= $vocabulary;
+		// Texts of the three Pinterest blocks ride the same request — no extra call.
+		$pin_block      = LAGR_Settings::get( 'pin_texts_in_prompt', 1 ) ? self::pin_prompt_block() : '';
+		$system_prompt .= $pin_block;
+		$max_tokens    += ( '' !== $vocabulary ? 250 : 0 ) + ( '' !== $pin_block ? 350 : 0 );
 
 		$payload = array(
 			'model'       => $config['model'],
@@ -229,20 +257,24 @@ PROMPT;
 			'meta_description'  => sanitize_text_field( (string) ( $parsed['meta_description'] ?? '' ) ),
 			'tasks_answer'      => sanitize_textarea_field( (string) ( $parsed['tasks_answer'] ?? '' ) ),
 			'faq'               => array_slice( $faq, 0, 3 ),
-			'tags'               => array_map( 'sanitize_text_field', (array) ( $parsed['tags'] ?? array() ) ),
+			// {tags, mapped, proposed} — validated against the vocabulary in LAGR_Vocabulary::assign().
+			'tag_block'         => '' !== $vocabulary ? LAGR_Vocabulary::llm_block_from( $parsed ) : null,
 			'install_command'   => sanitize_text_field( $parsed['install_command'] ?? '' ),
+			'pin_texts'         => '' !== $pin_block ? self::pin_texts_from( $parsed ) : null,
+			'model'             => $config['model'],
 		);
 	}
 
 	/**
-	 * The prompt actually sent: the saved one, unless it is empty or still the
-	 * previous built-in text (see LEGACY_SYSTEM_PROMPT) — then the current
+	 * The prompt actually sent: the saved one, unless it is empty or still a
+	 * previous built-in text (LEGACY_SYSTEM_PROMPT / _V2) — then the current
 	 * built-in. Compared with whitespace collapsed, because the settings form
 	 * round-trips it through sanitize_textarea_field().
 	 */
 	public static function active_system_prompt() {
 		$saved = trim( (string) LAGR_Settings::get( 'llm_system_prompt', '' ) );
-		if ( '' === $saved || self::normalize_ws( $saved ) === self::normalize_ws( self::LEGACY_SYSTEM_PROMPT ) ) {
+		$legacy = array( self::normalize_ws( self::LEGACY_SYSTEM_PROMPT ), self::normalize_ws( self::LEGACY_SYSTEM_PROMPT_V2 ) );
+		if ( '' === $saved || in_array( self::normalize_ws( $saved ), $legacy, true ) ) {
 			return self::DEFAULT_SYSTEM_PROMPT;
 		}
 		return $saved;
@@ -293,6 +325,139 @@ PROMPT;
 			$html .= ( '' !== $html ? '<h2>Подробнее</h2>' : '' ) . $body_html;
 		}
 		return $html;
+	}
+
+	// ------------------------------------------------------ Pinterest texts
+
+	/** Budget per block comes from the default pin preset — measured on its layout. */
+	public static function pin_prompt_block() {
+		$budget = LAGR_Pin_Composer::block_budget( LAGR_Pin_Presets::get() );
+		return sprintf(
+			"\n\nPINTEREST-КАРТОЧКА. Добавь в JSON-ответ ещё три поля — тексты трёх блоков картинки:\n" .
+			"  \"pin_what\": \"Что это? — что за инструмент и для кого\",\n" .
+			"  \"pin_does\": \"Что это делает? — главное, что он умеет\",\n" .
+			"  \"pin_problem\": \"Какую проблему решает? — какая боль уходит\"\n" .
+			"Каждое поле — до %d символов, 1-2 законченных предложения. Без названия репозитория в начале, без эмодзи и хэштегов, без перечислений через запятую. Три поля не повторяют друг друга. Язык: русский.",
+			$budget
+		);
+	}
+
+	public static function pin_texts_from( array $parsed ) {
+		$out = array();
+		foreach ( array( 'pin_what', 'pin_does', 'pin_problem' ) as $key ) {
+			$out[] = sanitize_text_field( is_string( $parsed[ $key ] ?? null ) ? $parsed[ $key ] : '' );
+		}
+		return array_filter( $out ) ? $out : null;
+	}
+
+	/** The three pin texts alone — for repos collected before the pin existed. */
+	public function pin_texts( array $repo ) {
+		$provider = LAGR_Settings::get( 'llm_provider', 'deepseek' );
+		$config   = LAGR_Settings::llm_provider_config( $provider );
+		$system   = "Ты пишешь тексты для Pinterest-карточки GitHub-репозитория. Верни СТРОГО JSON-объект (без markdown-обёртки) только с полями pin_what, pin_does, pin_problem. Не придумывай фактов, которых нет в данных." . self::pin_prompt_block();
+
+		$content = $this->call(
+			$config,
+			array(
+				'model'       => $config['model'],
+				'max_tokens'  => 600,
+				'temperature' => 0.4,
+				'messages'    => array(
+					array(
+						'role'    => 'system',
+						'content' => $system,
+					),
+					array(
+						'role'    => 'user',
+						'content' => $this->build_user_prompt( $repo ),
+					),
+				),
+			),
+			1
+		);
+		$parsed = $content ? $this->extract_json( $content ) : null;
+		$texts  = $parsed ? self::pin_texts_from( $parsed ) : null;
+		return ( $texts && 3 === count( array_filter( $texts ) ) ) ? $texts : null;
+	}
+
+	/**
+	 * Rewrites a block shorter, keeping the meaning — never cuts it (same rule
+	 * as LAA_Title_Shortener in llm-agent-articles). Returns '' when the model
+	 * can't land inside the limit; the caller then reports instead of cutting.
+	 */
+	public function shorten_text( $text, $max ) {
+		$text = trim( (string) $text );
+		$max  = (int) $max;
+		if ( $max < 1 || mb_strlen( $text ) <= $max ) {
+			return $text;
+		}
+		$provider = LAGR_Settings::get( 'llm_provider', 'deepseek' );
+		$config   = LAGR_Settings::llm_provider_config( $provider );
+		$system   = 'Ты редактор. Сократи текст, не потеряв смысл. Верни СТРОГО JSON {"text": "..."}. Это переформулировка, а не обрезка: нельзя оборвать фразу, нельзя заканчивать многоточием, нельзя добавлять новых фактов. Язык — тот же.';
+
+		for ( $attempt = 1; $attempt <= 2; $attempt++ ) {
+			$content = $this->call(
+				$config,
+				array(
+					'model'       => $config['model'],
+					'max_tokens'  => 300,
+					'temperature' => 0.3,
+					'messages'    => array(
+						array(
+							'role'    => 'system',
+							'content' => $system,
+						),
+						array(
+							'role'    => 'user',
+							'content' => sprintf( "Предел: %d символов (сейчас %d).%s\nТекст: %s", $max, mb_strlen( $text ), $attempt > 1 ? ' Прошлый вариант был длиннее предела — сократи сильнее.' : '', $text ),
+						),
+					),
+				),
+				1
+			);
+			$parsed    = $content ? $this->extract_json( $content ) : null;
+			$candidate = trim( sanitize_text_field( (string) ( $parsed['text'] ?? '' ) ) );
+			if ( '' !== $candidate && mb_strlen( $candidate ) <= $max && '…' !== mb_substr( $candidate, -1 ) ) {
+				return $candidate;
+			}
+		}
+		return '';
+	}
+
+	/**
+	 * Tags only — for records whose description already exists (CLI re-tagging).
+	 * Returns the parsed {tags, mapped, proposed} block or null.
+	 */
+	public function classify_tags( array $repo, array $unresolved ) {
+		$provider = LAGR_Settings::get( 'llm_provider', 'deepseek' );
+		$config   = LAGR_Settings::llm_provider_config( $provider );
+		$block    = LAGR_Vocabulary::prompt_block( $unresolved );
+		if ( '' === $block ) {
+			return null;
+		}
+		$system = "Ты размечаешь карточку каталога тегами задач. Верни СТРОГО JSON-объект (без markdown-обёртки) только с полями tags, mapped, proposed." . $block;
+
+		$content = $this->call(
+			$config,
+			array(
+				'model'       => $config['model'],
+				'max_tokens'  => 400,
+				'temperature' => 0.2,
+				'messages'    => array(
+					array(
+						'role'    => 'system',
+						'content' => $system,
+					),
+					array(
+						'role'    => 'user',
+						'content' => $this->build_user_prompt( $repo ),
+					),
+				),
+			),
+			1
+		);
+		$parsed = $content ? $this->extract_json( $content ) : null;
+		return $parsed ? LAGR_Vocabulary::llm_block_from( $parsed ) : null;
 	}
 
 	private function build_user_prompt( array $repo ) {

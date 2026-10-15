@@ -11,7 +11,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  * button needs JS (view.js), and it degrades to a selectable command.
  *
  * The FAQ sits outside the tabs on purpose: it is marked up as FAQPage
- * (LAGR_Schema), and the marked-up answers must be visible on the page.
+ * (LAGR_Schema), and the marked-up answers must be on the page itself — an
+ * accordion of <details> keeps them in the HTML, a hidden tab panel is
+ * further from "visible" than search engines like.
  */
 
 $post_id = get_the_ID();
@@ -90,9 +92,12 @@ if ( ! empty( $faq ) ) {
 	$faq_html = '<section class="lagr-faq" aria-labelledby="' . esc_attr( $uid ) . '-faq">'
 		. '<h2 id="' . esc_attr( $uid ) . '-faq" class="lagr-faq-title">Частые вопросы</h2>';
 	foreach ( $faq as $i => $item ) {
-		// #faq-N — the Question nodes in LAGR_Schema link to these anchors.
-		$faq_html .= '<div class="lagr-faq-item" id="faq-' . ( $i + 1 ) . '"><h3 class="lagr-faq-q">' . esc_html( $item['question'] ) . '</h3>'
-			. '<div class="lagr-faq-a">' . $item['answer_html'] . '</div></div>';
+		// Accordion on native <details>: no JS, and the collapsed answers stay in
+		// the HTML, so the FAQPage markup still matches text on the page. The
+		// first one (install) starts open. #faq-N — LAGR_Schema links there.
+		$faq_html .= '<details class="lagr-faq-item" id="faq-' . ( $i + 1 ) . '"' . ( 0 === $i ? ' open' : '' ) . '>'
+			. '<summary class="lagr-faq-q"><h3>' . esc_html( $item['question'] ) . '</h3></summary>'
+			. '<div class="lagr-faq-a">' . $item['answer_html'] . '</div></details>';
 	}
 	$faq_html .= '</section>';
 }

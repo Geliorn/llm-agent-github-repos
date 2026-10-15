@@ -613,8 +613,8 @@
 	font-weight: 500;
 }
 
-/* "Частые вопросы" under the tabs — always visible (FAQPage markup must
- * match visible text), styled as a quiet list of question/answer pairs. */
+/* "Частые вопросы" under the tabs — an accordion of native <details>
+ * (answers stay in the HTML for the FAQPage markup), first item open. */
 .lagr-faq {
 	margin-top: 32px;
 	padding-top: 24px;
@@ -624,13 +624,47 @@
 	margin-top: 0;
 	font-size: 1.375rem;
 }
-.lagr-faq-item + .lagr-faq-item {
-	margin-top: 20px;
+.lagr-faq-item {
+	border-bottom: 1px solid var(--wp--preset--color--light, #e3e2dd);
 }
 .lagr-faq-q {
-	margin: 0 0 6px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 14px 0;
+	cursor: pointer;
+	list-style: none;
+}
+.lagr-faq-q::-webkit-details-marker {
+	display: none;
+}
+.lagr-faq-q h3 {
+	margin: 0;
 	font-size: 1rem;
 	font-weight: 600;
+}
+.lagr-faq-q::after {
+	content: "+";
+	flex: none;
+	font-size: 1.25rem;
+	line-height: 1;
+	color: var(--wp--preset--color--accent, #2f5d4f);
+	transition: transform 0.15s ease;
+}
+.lagr-faq-item[open] > .lagr-faq-q::after {
+	transform: rotate(45deg);
+}
+.lagr-faq-q:hover h3 {
+	color: var(--wp--preset--color--accent, #2f5d4f);
+}
+.lagr-faq-q:focus-visible {
+	outline: 2px solid var(--wp--preset--color--accent, #2f5d4f);
+	outline-offset: 2px;
+	border-radius: 3px;
+}
+.lagr-faq-a {
+	padding: 0 0 16px;
 }
 .lagr-faq-a > :first-child {
 	margin-top: 0;

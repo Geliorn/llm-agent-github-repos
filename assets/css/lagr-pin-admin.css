@@ -1,0 +1,78 @@
+/* Pinterest pin screen — layout ported from llm-agent-articles' preset screens. */
+
+.lagr-pin-boxes {
+	display: flex;
+	gap: 20px;
+	flex-wrap: wrap;
+	margin: 12px 0 8px;
+}
+
+.lagr-pin-box {
+	flex: 1 1 420px;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	padding: 4px 20px 12px;
+}
+
+.lagr-pin-layout {
+	display: flex;
+	gap: 28px;
+	align-items: flex-start;
+	flex-wrap: wrap;
+}
+
+.lagr-pin-form {
+	flex: 1 1 640px;
+	min-width: 520px;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	padding: 4px 20px 16px;
+}
+
+.lagr-pin-preview {
+	flex: 0 1 420px;
+	position: sticky;
+	top: 50px;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	padding: 4px 20px 16px;
+}
+
+.lagr-pin-preview img {
+	max-width: 100%;
+	height: auto;
+	display: block;
+	border: 1px solid #dcdcde;
+}
+
+.lagr-pin-preview textarea + textarea {
+	margin-top: 6px;
+}
+
+.lagr-pin-form .form-table th {
+	width: 170px;
+	padding-top: 14px;
+}
+
+.lagr-pin-form .form-table td {
+	padding-top: 10px;
+	line-height: 2.4;
+}
+
+.lagr-media {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.lagr-media-thumb img {
+	display: block;
+	width: 60px;
+	height: 60px;
+	object-fit: cover;
+	border: 1px solid #dcdcde;
+}
+
+.lagr-delete {
+	color: #b32d2e;
+}

@@ -69,6 +69,24 @@ class LAGR_Settings {
 			// (old all-in-one behaviour), 'none' (discard), or any other registered taxonomy slug.
 			'extra_topics_taxonomy' => 'post_tag',
 
+			// Task vocabulary (post_tag) — see LAGR_Vocabulary / docs/tag-mapping.md.
+			'tags_unresolved_policy'  => 'candidate', // topics nobody mapped, when no model ran: 'candidate' | 'drop'
+			'tags_candidates_per_run' => 20,  // new candidates per collector run (0 = unlimited)
+			'tags_candidates_per_day' => 100, // and per day
+			'tags_alias_threshold'    => 3,   // model mappings before a string becomes an alias
+			'tags_ready_threshold'    => 5,   // candidate count → "ready for review"
+			'tags_floor'              => 3,   // approved below this for 90 days → merge proposal
+			'tags_corridor_min'       => 60,
+			'tags_corridor_max'       => 90,
+			'tags_auto_approve'       => 0,   // off: a human stays the gate
+			'tags_auto_approve_count' => 15,
+			'tags_regulator_enabled'  => 0,   // switched on by the migration
+
+			// Pinterest pin (see LAGR_Pin_Service). Texts ride the description request.
+			'pin_texts_in_prompt'     => 1,
+			'pin_on_collect'          => 1,
+			'pin_default_preset'      => 'dark',
+
 			// SEO plugin whose own meta field gets the generated description — 'none' skips it.
 			'seo_plugin'                    => 'yoast',
 

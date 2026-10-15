@@ -2,7 +2,7 @@
 /**
  * Plugin Name: GitHub Repo Collector
  * Description: Универсальный сборщик подборок GitHub-репозиториев по настраиваемым правилам (топики, звёзды, свежесть), с публикацией карточек на сайте. Самодостаточен — сам регистрирует тип записи и поля, не зависит от ACF/CPT UI.
- * Version: 0.8.0
+ * Version: 0.10.0
  * Author: llm-agent.ru
  * Text Domain: lagr
  */
@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'LAGR_VERSION', '0.8.0' );
+define( 'LAGR_VERSION', '0.10.0' );
 define( 'LAGR_PLUGIN_FILE', __FILE__ );
 define( 'LAGR_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LAGR_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -36,6 +36,16 @@ require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-related.php';
 require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-blocks.php';
 require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-patterns.php';
 require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-filters.php';
+require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-vocabulary.php';
+require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-tag-queue.php';
+require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-tag-regulator.php';
+require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-tag-migrate.php';
+require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-tag-admin.php';
+require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-image-composer.php';
+require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-pin-presets.php';
+require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-pin-composer.php';
+require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-pin-service.php';
+require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-pin-admin.php';
 
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	require_once LAGR_PLUGIN_DIR . 'includes/class-lagr-cli.php';
@@ -56,6 +66,10 @@ function lagr_boot() {
 	LAGR_Patterns::init();
 	LAGR_Filters::init();
 	LAGR_Schema::init();
+	LAGR_Vocabulary::init();
+	LAGR_Tag_Admin::init();
+	LAGR_Pin_Service::init();
+	LAGR_Pin_Admin::init();
 }
 add_action( 'plugins_loaded', 'lagr_boot' );
 
