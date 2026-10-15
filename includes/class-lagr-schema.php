@@ -4,7 +4,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * JSON-LD for a single repo page: SoftwareSourceCode (the repo itself),
+ * JSON-LD for a single repo page: SoftwareSourceCode (the repo itself; also
+ * SoftwareApplication with the visitors' rating once it has enough votes),
  * FAQPage (the questions from LAGR_FAQ) and BreadcrumbList.
  *
  * With Yoast active, everything goes INTO Yoast's own @graph instead of a
@@ -262,11 +263,57 @@ class LAGR_Schema {
 			$node['keywords'] = implode( ', ', array_unique( $keywords ) );
 		}
 
+		$node = array_merge( $node, self::application_fields( $post_id ) );
+
 		return array_filter(
 			$node,
 			static function ( $v ) {
 				return '' !== $v && array() !== $v;
 			}
+		);
+	}
+
+	/**
+	 * Below this many votes the rating stays out of the markup: one cookie per
+	 * browser is the only guard against repeat votes, and a score from one or
+	 * two votes is exactly the kind of rating Google treats as unreliable.
+	 */
+	const RATING_MIN_VOTES = 3;
+
+	/**
+	 * With enough votes the repo is ALSO marked as SoftwareApplication — the
+	 * type Google shows review stars for (SoftwareSourceCode gets none) — with
+	 * the visitors' own rating, the same numbers the lagr/rating block prints
+	 * («4,3 / 5 · 7 оценок»). Without a rating the node stays plain
+	 * SoftwareSourceCode: an "application" claim buys nothing then, and for a
+	 * library it would be a stretch. operatingSystem is left out on purpose —
+	 * only recommended by Google, and not knowable per repo.
+	 */
+	private static function application_fields( $post_id ) {
+		if ( ! LAGR_Settings::integration_enabled( 'ratings' ) ) {
+			return array(); // no rating on the page → none in the markup.
+		}
+		$count = LAGR_Ratings::get_count( $post_id );
+		/** Minimum votes before the rating goes into the JSON-LD. */
+		if ( $count < (int) apply_filters( 'lagr_schema_rating_min_votes', self::RATING_MIN_VOTES ) ) {
+			return array();
+		}
+		return array(
+			'@type'               => array( 'SoftwareSourceCode', 'SoftwareApplication' ),
+			'applicationCategory' => 'DeveloperApplication',
+			// A public GitHub repo is free to get, whatever its license.
+			'offers'              => array(
+				'@type'         => 'Offer',
+				'price'         => '0',
+				'priceCurrency' => 'RUB',
+			),
+			'aggregateRating'     => array(
+				'@type'       => 'AggregateRating',
+				'ratingValue' => LAGR_Ratings::get_average( $post_id ),
+				'ratingCount' => $count,
+				'bestRating'  => 5,
+				'worstRating' => 1,
+			),
 		);
 	}
 

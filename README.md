@@ -1,6 +1,6 @@
 # GitHub Repo Collector (llm-agent-github-repos)
 
-Версия 0.10.0 · Самодостаточный WordPress-плагин: собирает подборки GitHub-репозиториев по настраиваемым правилам (топики, звёзды, свежесть) и публикует их на сайте карточками. Не зависит от ACF/CPT UI и вообще от каких-либо других плагинов — переносим на любой сайт копированием папки.
+Версия 0.10.1 · Самодостаточный WordPress-плагин: собирает подборки GitHub-репозиториев по настраиваемым правилам (топики, звёзды, свежесть) и публикует их на сайте карточками. Не зависит от ACF/CPT UI и вообще от каких-либо других плагинов — переносим на любой сайт копированием папки.
 
 Проектный план и обоснование решений — `docs/github-repo-parser-plan.md` в корне репозитория. Этот файл — справочник по тому, что реально реализовано в коде.
 
@@ -348,6 +348,7 @@ score = stars + forks × score_forks_weight   (по умолчанию вес 3)
 
 - С Yoast (`WPSEO_VERSION`): узлы добавляются в граф Yoast через `wpseo_schema_graph`, а не вторым `<script>`. WebPage получает тип `FAQPage` и `mainEntity` → узлы `Question` (так же делает FAQ-блок самого Yoast) и `about` → узел `SoftwareSourceCode` (репозиторий: `codeRepository`, язык, лицензия SPDX, автор, даты, версия релиза, ключевые слова). Цепочка крошек Yoast (`wpseo_breadcrumb_links`) выровнена с видимой: Главная → Каталог → тема → репозиторий.
 - Без Yoast: собственный `<script type="application/ld+json">` в `wp_head` с SoftwareSourceCode, WebPage/FAQPage и BreadcrumbList.
+- **Рейтинг (с 0.10.1).** Когда у репозитория не меньше 3 оценок посетителей (`LAGR_Schema::RATING_MIN_VOTES`, фильтр `lagr_schema_rating_min_votes`), узел получает двойной тип `SoftwareSourceCode` + `SoftwareApplication` — звёзды в выдаче Google показывает для `SoftwareApplication`, не для `SoftwareSourceCode` — и поля `applicationCategory: DeveloperApplication`, `offers` с ценой 0, `aggregateRating` (те же числа, что печатает блок `lagr/rating`: «4,3 / 5 · 7 оценок»). Меньше 3 оценок или выключен `integration_ratings` — узел остаётся просто `SoftwareSourceCode`, без рейтинга. `operatingSystem` не выводится намеренно: у Google он только рекомендован, а правдиво определить его для каждого репозитория нельзя. Звёзды в выдаче не гарантированы — показ решает Google; проверять в Search Console → «Эффективность» → «Вид в поиске».
 
 **Мета-теги** (`LAGR_SEO::apply_meta()`, по настройке `seo_plugin`): title из `meta_title`, description из `meta_description` (без LLM — первые ~30 слов анонса), картинка для соцсетей — карточка GitHub `https://opengraph.githubassets.com/1/{owner}/{repo}`, если у записи нет миниатюры. Сами теги `og:`/`twitter:` и `canonical` печатает SEO-плагин из этих полей.
 
