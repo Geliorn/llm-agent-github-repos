@@ -3,7 +3,7 @@
  * color, backgrounds, spacing scale) is left to the active theme's
  * theme.json. Only the handful of semantic colors we decided to keep
  * fixed across every site in the network live here (topic pill blue,
- * heart rating red) — see docs/stack-decisions.md.
+ * rating-star gold) — see docs/stack-decisions.md.
  */
 
 .lagr-card {
@@ -141,8 +141,9 @@
 	font-variant-numeric: tabular-nums;
 }
 
-/* Own rating widget (lagr/rating) — replaces WP-PostRatings, same ♡ red
- * used across the mockups. */
+/* Own rating widget (lagr/rating) — SVG stars since 0.10.2 (Google-snippet
+ * look: Material star, #FBBC04; same as partner-catalog). The empty track is
+ * mixed from the text colour so it reads on light and dark style variations. */
 .lagr-rating {
 	/* NOT inline-flex: this sits as a direct top-level child in the single
 	 * page's layout, centered by the theme's "constrained" content-width
@@ -155,7 +156,15 @@
 	display: flex;
 	align-items: center;
 	gap: 8px;
+	--lagr-star: #fbbc04;
+	--lagr-star-empty: color-mix(in srgb, currentColor 20%, transparent);
 }
+.lagr-stars { display: inline-block; flex: none; vertical-align: -2px; }
+.lagr-stars-empty { fill: var(--lagr-star-empty, color-mix(in srgb, currentColor 20%, transparent)); }
+.lagr-stars-full { fill: var(--lagr-star, #fbbc04); }
+.lagr-rating-line { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }
+.lagr-r-val { font-weight: 600; font-variant-numeric: tabular-nums; }
+.lagr-r-count { color: color-mix(in srgb, currentColor 55%, transparent); }
 .lagr-rating-stars {
 	display: inline-flex;
 	gap: 2px;
@@ -164,21 +173,24 @@
 	background: none;
 	border: none;
 	padding: 0;
-	font-size: 15px;
-	line-height: 1;
-	color: #c0392b;
+	line-height: 0;
 	cursor: pointer;
 }
-.lagr-rating-large .lagr-rating-star {
-	font-size: 26px;
+.lagr-rating-star svg {
+	width: 18px;
+	height: 18px;
+	fill: var(--lagr-star-empty);
+	transition: fill .1s;
+}
+.lagr-rating-large .lagr-rating-star svg {
+	width: 26px;
+	height: 26px;
+}
+.lagr-rating-star.is-on svg {
+	fill: var(--lagr-star);
 }
 .lagr-rating-star:disabled {
 	cursor: default;
-	opacity: 0.85;
-}
-.lagr-rating-voted .lagr-rating-star {
-	/* Filled hearts for a vote already cast — same glyph, visually "on". */
-	text-shadow: 0 0 0 currentColor;
 }
 .lagr-rating-score {
 	font-size: 12.5px;

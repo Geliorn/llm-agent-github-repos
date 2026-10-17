@@ -5,7 +5,7 @@
 	blocks.registerBlockType( 'lagr/rating', {
 		edit: function() {
 			var blockProps = blockEditor.useBlockProps();
-			return el( 'p', blockProps, el( 'em', null, '♡ Рейтинг репозитория (собственный виджет, голосование — на реальной странице)' ) );
+			return el( 'p', blockProps, el( 'em', null, '★ Рейтинг репозитория (собственный виджет, голосование — на реальной странице)' ) );
 		},
 		// Dynamic block — actual markup comes from render.php on the server.
 		save: function() {

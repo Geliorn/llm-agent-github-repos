@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Styling follows the earlier design decision: no hardcoded theme colors,
  * every block inherits the active theme's theme.json — except the handful
  * of semantic colors we decided to keep fixed everywhere (topic pill blue,
- * heart-rating red), which live in assets/css/patterns.css via className,
+ * rating-star gold), which live in assets/css/patterns.css via className,
  * never inline style JSON.
  */
 class LAGR_Patterns {
@@ -204,6 +204,16 @@ class LAGR_Patterns {
 			$attrs['className'] = $className;
 		}
 		return '<!-- wp:lagr/rating ' . wp_json_encode( $attrs ) . ' /-->';
+	}
+
+	/**
+	 * «Где попробовать» — services from partner-catalog's catalog, under the
+	 * repo text. A block of the OTHER plugin: only put into the pattern when
+	 * partner-catalog is active, so this plugin stays installable on its own.
+	 * The module's on/off switch and ranking live in partner-catalog.
+	 */
+	private static function recommended_block() {
+		return class_exists( 'PC_Recommend' ) ? '<!-- wp:partner-catalog/recommended /-->' : '';
 	}
 
 	/** "Похожие репозитории" — own block (`lagr/related-posts`), replacing the Contextual Related Posts shortcode (same Query Loop reasoning as ratings_block() above). */
@@ -492,6 +502,7 @@ class LAGR_Patterns {
 <!-- wp:column {"width":"64%"} -->
 <div class="wp-block-column" style="flex-basis:64%">
 <!-- wp:lagr/repo-content /-->
+' . self::recommended_block() . '
 </div>
 <!-- /wp:column -->
 

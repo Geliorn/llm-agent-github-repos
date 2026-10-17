@@ -22,17 +22,10 @@ $wrapper_attributes = get_block_wrapper_attributes( array( 'class' => 'lagr-rela
 
 echo '<div ' . $wrapper_attributes . '>';
 foreach ( $related as $related_post ) {
-	$avg   = LAGR_Ratings::get_average( $related_post->ID );
-	$count = LAGR_Ratings::get_count( $related_post->ID );
-
 	echo '<a class="lagr-related-card" href="' . esc_url( get_permalink( $related_post ) ) . '">';
 	echo '<span class="lagr-related-title">' . esc_html( get_the_title( $related_post ) ) . '</span>';
-	if ( $count > 0 ) {
-		printf(
-			'<span class="lagr-related-rating">♡ <b>%1$s</b> (%2$d)</span>',
-			esc_html( number_format_i18n( $avg, 1 ) ),
-			$count
-		);
+	if ( LAGR_Settings::integration_enabled( 'ratings' ) ) {
+		echo '<span class="lagr-related-rating">' . LAGR_Ratings::line_html( $related_post->ID, 12 ) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput -- escaped inside.
 	}
 	echo '</a>';
 }

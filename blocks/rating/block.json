@@ -4,7 +4,7 @@
 	"name": "lagr/rating",
 	"title": "Рейтинг репозитория",
 	"category": "widgets",
-	"description": "Собственный рейтинговый виджет (заменяет WP-PostRatings) — клик по сердечку голосует через AJAX, один голос на браузер.",
+	"description": "Собственный рейтинговый виджет (заменяет WP-PostRatings) — клик по звезде голосует через AJAX (SVG-звёзды как в сниппетах Google), один голос на браузер.",
 	"textdomain": "lagr",
 	"attributes": {
 		"size": { "type": "string", "default": "small" },
