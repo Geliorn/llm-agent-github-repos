@@ -44,7 +44,8 @@ class LAGR_Pin_Admin {
 		wp_enqueue_style( 'lagr-pin-admin', LAGR_PLUGIN_URL . 'assets/css/lagr-pin-admin.css', array(), LAGR_VERSION );
 		if ( $is_page ) {
 			wp_enqueue_media();
-			wp_enqueue_script( 'lagr-pin', LAGR_PLUGIN_URL . 'assets/js/lagr-pin.js', array( 'jquery' ), LAGR_VERSION, true );
+			wp_enqueue_style( 'wp-color-picker' );
+			wp_enqueue_script( 'lagr-pin', LAGR_PLUGIN_URL . 'assets/js/lagr-pin.js', array( 'jquery', 'wp-color-picker' ), LAGR_VERSION, true );
 			wp_localize_script(
 				'lagr-pin',
 				'lagrPin',
