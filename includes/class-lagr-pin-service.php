@@ -29,7 +29,10 @@ class LAGR_Pin_Service {
 	const META_PRESET    = '_gh_pin_preset';
 	const META_DESC      = '_gh_pin_description';
 	const META_ERROR     = '_gh_pin_error';
+	const META_PALETTE   = '_gh_pin_palette'; // theme palette slug the pin was painted with
+	const META_UTM       = '_gh_pin_utm';     // utm_content label: dark-magma / light-indigo / fixed-<preset>
 	const ATTACHMENT_MARK = '_lagr_pin';
+	const PALETTE_CURSOR  = 'lagr_pin_palette_cursor';
 
 	public static function init() {
 		add_action( 'init', array( __CLASS__, 'register_meta' ), 20 );
@@ -41,6 +44,8 @@ class LAGR_Pin_Service {
 			self::META_GENERATED => 'integer',
 			self::META_PRESET    => 'string',
 			self::META_DESC      => 'string',
+			self::META_PALETTE   => 'string',
+			self::META_UTM       => 'string',
 		);
 		foreach ( $fields as $key => $type ) {
 			register_post_meta(
@@ -176,9 +181,11 @@ class LAGR_Pin_Service {
 			$notes[] = 'Тексты блоков написаны моделью';
 		}
 
-		$preset_id = (string) ( $opts['preset'] ?? '' );
-		$preset    = LAGR_Pin_Presets::get( $preset_id );
-		$data      = self::data_for( $post_id );
+		$preset_id  = (string) ( $opts['preset'] ?? '' );
+		$preset_key = $preset_id ?: (string) LAGR_Settings::get( 'pin_default_preset', 'dark' );
+		$preset     = LAGR_Pin_Presets::get( $preset_id );
+		list( $preset, $palette ) = self::colourise( $preset, $post_id, ! empty( $opts['recolor'] ) );
+		$data       = self::data_for( $post_id );
 
 		$rendered = self::render_fitting( $preset, $data, $notes );
 		if ( ! $rendered['ok'] ) {
@@ -209,9 +216,16 @@ class LAGR_Pin_Service {
 
 		update_post_meta( $post_id, self::META_IMAGE, $attachment_id );
 		update_post_meta( $post_id, self::META_GENERATED, time() );
-		update_post_meta( $post_id, self::META_PRESET, $preset_id ?: (string) LAGR_Settings::get( 'pin_default_preset', 'dark' ) );
+		update_post_meta( $post_id, self::META_PRESET, $preset_key );
 		update_post_meta( $post_id, self::META_DESC, $description );
 		delete_post_meta( $post_id, self::META_ERROR );
+		if ( $palette ) {
+			update_post_meta( $post_id, self::META_PALETTE, $palette );
+		} else {
+			delete_post_meta( $post_id, self::META_PALETTE );
+		}
+		$utm = $palette ? LAGR_Theme_Palette::utm_label( $palette ) : 'fixed-' . $preset_key;
+		update_post_meta( $post_id, self::META_UTM, $utm );
 
 		$info = array(
 			'url'         => wp_get_attachment_url( $attachment_id ),
@@ -219,11 +233,64 @@ class LAGR_Pin_Service {
 			'title'       => $data['full_name'],
 			'description' => $description,
 			'texts'       => $rendered['blocks'],
+			'palette'     => $palette,
+			'utm_content' => $utm,
 		);
 		do_action( 'lagr_pin_image_created', $post_id, $attachment_id, $info );
 
 		LAGR_Log::add( sprintf( 'Pinterest-картинка для %s собрана (#%d)%s', $data['full_name'], $attachment_id, $notes ? ' — ' . implode( '; ', $notes ) : '' ) );
 		return self::result( true, $attachment_id, '', $notes );
+	}
+
+	/**
+	 * Apply the preset's colour source.
+	 *   preset — colours as set in the preset, no palette;
+	 *   theme  — the palette the site shows right now (follows a theme switch);
+	 *   rotate — round-robin over the theme's palettes on the first build, then
+	 *            kept in meta so a rebuild repaints the same colours. $recolor
+	 *            asks for the next palette instead (and never the same one).
+	 *
+	 * @param bool $advance false = peek (preview) without moving the round-robin cursor.
+	 * @return array{0:array,1:string} preset, palette slug ('' when none)
+	 */
+	public static function colourise( array $preset, $post_id = 0, $recolor = false, $advance = true ) {
+		$source = (string) ( $preset['palette_source'] ?? 'preset' );
+		if ( 'preset' === $source || ! LAGR_Theme_Palette::all() ) {
+			return array( $preset, '' );
+		}
+
+		if ( 'theme' === $source ) {
+			$slug = LAGR_Theme_Palette::active_slug();
+		} else {
+			$stored = $post_id ? (string) get_post_meta( (int) $post_id, self::META_PALETTE, true ) : '';
+			$slug   = ( ! $recolor && '' !== $stored && LAGR_Theme_Palette::get( $stored ) )
+				? $stored
+				: self::next_palette( $advance, $recolor ? $stored : '' );
+		}
+
+		$palette = LAGR_Theme_Palette::get( $slug );
+		if ( ! $palette ) {
+			return array( $preset, '' );
+		}
+		return array( LAGR_Theme_Palette::apply( $preset, $palette, (string) ( $preset['palette_layout'] ?? 'accent' ) ), $slug );
+	}
+
+	/** Next palette of the round-robin; even spread is what makes the utm_content comparison fair. */
+	private static function next_palette( $advance = true, $avoid = '' ) {
+		$slugs = array_keys( LAGR_Theme_Palette::all() );
+		$count = count( $slugs );
+		if ( ! $count ) {
+			return '';
+		}
+		$cursor = (int) get_option( self::PALETTE_CURSOR, 0 );
+		if ( $count > 1 && $slugs[ $cursor % $count ] === $avoid ) {
+			++$cursor;
+		}
+		$slug = $slugs[ $cursor % $count ];
+		if ( $advance ) {
+			update_option( self::PALETTE_CURSOR, ( $cursor + 1 ) % $count, false );
+		}
+		return $slug;
 	}
 
 	/** Render; on overflow have the model rewrite the offending blocks inside the measured budget. */

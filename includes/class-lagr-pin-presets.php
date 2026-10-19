@@ -104,6 +104,11 @@ class LAGR_Pin_Presets {
 		return array(
 			'name'                 => 'Новый пресет',
 
+			// colours: the preset's own hex fields, or the theme's palette roles
+			// (LAGR_Theme_Palette) — the active one or rotated per pin.
+			'palette_source'       => 'preset',
+			'palette_layout'       => 'accent',
+
 			// canvas — Pinterest's recommended 2:3.
 			'width'                => 1000,
 			'height'               => 1500,
@@ -235,10 +240,26 @@ class LAGR_Pin_Presets {
 		);
 	}
 
+	/** Where a preset takes its colours from. */
+	public static function palette_sources() {
+		return array(
+			'preset' => 'Из пресета (поля ниже)',
+			'theme'  => 'Из темы — активная палитра сайта',
+			'rotate' => 'Из темы — ротация палитр по пинам',
+		);
+	}
+
 	public static function get_all() {
 		$stored = get_option( self::OPTION_KEY, array() );
 		if ( ! is_array( $stored ) || empty( $stored ) ) {
 			return self::seed_presets();
+		}
+		// Sites seeded before the theme-colour preset existed get it once; a
+		// later delete is respected (the flag stays set).
+		if ( ! isset( $stored['theme'] ) && ! get_option( 'lagr_pin_theme_preset_added' ) ) {
+			$stored['theme'] = self::seed_presets()['theme'];
+			update_option( self::OPTION_KEY, $stored, false );
+			update_option( 'lagr_pin_theme_preset_added', 1, false );
 		}
 		$out = array();
 		foreach ( $stored as $id => $preset ) {
@@ -354,6 +375,8 @@ class LAGR_Pin_Presets {
 		);
 
 		$choices = array(
+			'palette_source'      => self::palette_sources(),
+			'palette_layout'      => LAGR_Theme_Palette::layouts(),
 			'background_mode'     => self::background_modes(),
 			'block_layout'        => self::block_layouts(),
 			'badge_style'         => self::badge_styles(),
@@ -481,10 +504,22 @@ class LAGR_Pin_Presets {
 			$base
 		);
 
+		// Theme colours, rotated per pin (layout B — accent fill). Structure is the
+		// dark preset's; every colour is replaced from the theme palette at render.
+		$theme = wp_parse_args(
+			array(
+				'name'           => 'Цвета темы (ротация)',
+				'palette_source' => 'rotate',
+				'palette_layout' => 'accent',
+			),
+			$dark
+		);
+
 		return array(
 			'dark'   => $dark,
 			'light'  => $light,
 			'accent' => $accent,
+			'theme'  => $theme,
 		);
 	}
 }

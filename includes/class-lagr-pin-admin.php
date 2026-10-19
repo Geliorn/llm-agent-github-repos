@@ -229,6 +229,14 @@ class LAGR_Pin_Admin {
 			<tr><th>Шрифты</th><td>заголовки <?php self::font_select( $p, 'font_heading' ); ?> текст <?php self::font_select( $p, 'font' ); ?></td></tr>
 		</table>
 
+		<h2>Цвета</h2>
+		<table class="form-table">
+			<tr><th>Откуда брать цвета</th><td><?php self::select( $p, 'palette_source', LAGR_Pin_Presets::palette_sources() ); ?>
+				<p class="description">«Из темы» — все цвета ниже заменяются палитрой темы сайта (текст подбирается по контрасту). При ротации каждый новый пин получает следующую палитру по кругу; она запоминается в записи, и пересборка сохраняет цвет. Палитра попадает в <code>utm_content</code> (например <code>dark-magma</code>).</p></td></tr>
+			<tr><th>Раскладка цветов темы</th><td><?php self::select( $p, 'palette_layout', LAGR_Theme_Palette::layouts() ); ?>
+				<p class="description">Используется, только когда цвета берутся из темы.</p></td></tr>
+		</table>
+
 		<h2>Фон</h2>
 		<table class="form-table">
 			<tr><th>Чем заполнять</th><td><?php self::select( $p, 'background_mode', LAGR_Pin_Presets::background_modes() ); ?><?php self::text( $p, 'background', 'цвет' ); ?></td></tr>
@@ -384,6 +392,8 @@ class LAGR_Pin_Admin {
 		}
 		$preset  = LAGR_Pin_Presets::sanitize( self::values_from_request( $_POST ) );
 		$repo_id = (int) ( $_POST['preview_repo'] ?? 0 );
+		// Show the theme colours the pin would get, without moving the rotation.
+		list( $preset, $palette ) = LAGR_Pin_Service::colourise( $preset, $repo_id, false, false );
 		$data    = $repo_id && 'github_repo' === get_post_type( $repo_id ) ? LAGR_Pin_Service::data_for( $repo_id, false ) : self::sample_data();
 		foreach ( array( 0, 1, 2 ) as $i ) {
 			$override = sanitize_text_field( wp_unslash( $_POST[ 'preview_text_' . $i ] ?? '' ) );
@@ -403,6 +413,9 @@ class LAGR_Pin_Admin {
 		@unlink( $tmp ); // phpcs:ignore
 
 		$notice = sprintf( 'Кегль текста блоков: %d px.', $result['text_size'] );
+		if ( $palette ) {
+			$notice .= sprintf( ' Палитра темы: %s (utm_content=%s).', LAGR_Theme_Palette::get( $palette )['title'], LAGR_Theme_Palette::utm_label( $palette ) );
+		}
 		if ( $result['overflow'] ) {
 			$parts = array();
 			foreach ( $result['overflow'] as $item ) {
@@ -496,6 +509,9 @@ class LAGR_Pin_Admin {
 		if ( 'github_repo' === $post->post_type && current_user_can( 'edit_post', $post->ID ) ) {
 			$url                  = wp_nonce_url( admin_url( 'admin-post.php?action=lagr_pin_generate&post_id=' . $post->ID ), 'lagr_pin_generate_' . $post->ID );
 			$actions['lagr_pin'] = sprintf( '<a href="%s">%s</a>', esc_url( $url ), get_post_meta( $post->ID, LAGR_Pin_Service::META_IMAGE, true ) ? 'Пересобрать pin' : 'Собрать pin' );
+			if ( get_post_meta( $post->ID, LAGR_Pin_Service::META_PALETTE, true ) ) {
+				$actions['lagr_pin_recolor'] = sprintf( '<a href="%s">%s</a>', esc_url( add_query_arg( 'recolor', 1, $url ) ), 'Пересобрать pin с новым цветом' );
+			}
 		}
 		return $actions;
 	}
@@ -509,8 +525,9 @@ class LAGR_Pin_Admin {
 		$r = LAGR_Pin_Service::create_for_post(
 			$post_id,
 			array(
-				'preset' => sanitize_key( wp_unslash( $_GET['preset'] ?? '' ) ),
-				'retext' => ! empty( $_GET['retext'] ),
+				'preset'  => sanitize_key( wp_unslash( $_GET['preset'] ?? '' ) ),
+				'retext'  => ! empty( $_GET['retext'] ),
+				'recolor' => ! empty( $_GET['recolor'] ),
 			)
 		);
 		set_transient( 'lagr_pin_notice_' . get_current_user_id(), $r['ok'] ? 'Pinterest-картинка собрана: ' . get_the_title( $post_id ) : 'Pinterest-картинка не собрана: ' . $r['error'], 60 );
@@ -519,21 +536,23 @@ class LAGR_Pin_Admin {
 	}
 
 	public static function bulk_actions( $actions ) {
-		$actions['lagr_pin_build'] = 'Собрать Pinterest-картинки';
+		$actions['lagr_pin_build']   = 'Собрать Pinterest-картинки';
+		$actions['lagr_pin_recolor'] = 'Пересобрать Pinterest-картинки с новым цветом';
 		return $actions;
 	}
 
 	public static function handle_bulk( $redirect, $action, $ids ) {
-		if ( 'lagr_pin_build' !== $action ) {
+		if ( ! in_array( $action, array( 'lagr_pin_build', 'lagr_pin_recolor' ), true ) ) {
 			return $redirect;
 		}
+		$opts = array( 'recolor' => 'lagr_pin_recolor' === $action );
 		$ok   = 0;
 		$fail = 0;
 		foreach ( array_slice( array_map( 'intval', (array) $ids ), 0, self::BULK_LIMIT ) as $id ) {
 			if ( ! current_user_can( 'edit_post', $id ) ) {
 				continue;
 			}
-			LAGR_Pin_Service::create_for_post( $id )['ok'] ? ++$ok : ++$fail;
+			LAGR_Pin_Service::create_for_post( $id, $opts )['ok'] ? ++$ok : ++$fail;
 		}
 		$msg = sprintf( 'Pinterest-картинки: собрано %d, не собрано %d.', $ok, $fail );
 		if ( count( (array) $ids ) > self::BULK_LIMIT ) {
