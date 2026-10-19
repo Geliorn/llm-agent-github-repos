@@ -70,9 +70,11 @@ class LAGR_Rule_Defaults {
 			return;
 		}
 
-		self::create_rule( 'AI-агенты', 'ai-agent', 50, true );
-		self::create_rule( 'Agent Skills', 'agent-skills', 10, true );
-		self::create_rule( 'MCP', 'mcp', 30, true );
+		// All seeded rules start DISABLED — a fresh install shouldn't collect
+		// content until the owner reviews the rules and enables them.
+		self::create_rule( 'AI-агенты', 'ai-agent', 50, false );
+		self::create_rule( 'Agent Skills', 'agent-skills', 10, false );
+		self::create_rule( 'MCP', 'mcp', 30, false );
 
 		foreach ( self::disabled_topics() as $topic => $stars ) {
 			self::create_rule( self::label_for_topic( $topic ), $topic, $stars, false );

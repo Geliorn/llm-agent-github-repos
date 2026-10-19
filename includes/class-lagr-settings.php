@@ -17,7 +17,7 @@ class LAGR_Settings {
 			'gh_budget_threshold'   => 4500,
 			'optional_contributors' => 0,
 			'optional_releases'     => 0,
-			'optional_languages'    => 0,
+			'optional_languages'    => 1,
 			'optional_top_files'    => 0,
 			// Whether to assign the repo_language / repo_license taxonomy at all —
 			// off by default: the network's main content (Agent Skills, MCP servers)
@@ -25,13 +25,13 @@ class LAGR_Settings {
 			// way a general code catalog would be. `_gh_language`/`_gh_license`
 			// meta is still always saved (free — comes with the base Repos API
 			// response); this only gates the taxonomy term + its display in patterns.
-			'collect_language'      => 0,
-			'collect_license'       => 0,
+			'collect_language'      => 1,
+			'collect_license'       => 1,
 			// Fetch, store and show the README (as its own tab). Off = keep only
 			// the AI-generated description; the raw README is still read as input
 			// for description generation, just not saved or displayed.
-			'collect_readme'        => 1,
-			'llm_enabled'           => 0,
+			'collect_readme'        => 0,
+			'llm_enabled'           => 1,
 			'llm_provider'          => 'deepseek',
 			// Description-generation tuning (all editable in the admin). The prompt
 			// field is pre-filled with the built-in prompt text (not left blank).
