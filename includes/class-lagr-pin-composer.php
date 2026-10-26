@@ -108,7 +108,7 @@ class LAGR_Pin_Composer extends LAGR_Image_Composer {
 
 		$area = self::content_area( $preset );
 		if ( $area['w'] < 200 || $area['h'] < 300 ) {
-			imagedestroy( $canvas );
+			self::destroy_image( $canvas );
 			return self::result( false, '', '', 'Поля съели всё полотно — уменьшите отступ' );
 		}
 
@@ -120,7 +120,7 @@ class LAGR_Pin_Composer extends LAGR_Image_Composer {
 		$ip  = self::block_preset( $preset );
 		$fit = self::fit_items( $ip, $fonts, $items, $area );
 		if ( ! $fit['ok'] && empty( $fit['cells'] ) ) {
-			imagedestroy( $canvas );
+			self::destroy_image( $canvas );
 			self::$footer_box = null;
 			return self::result( false, '', '', $fit['error'] );
 		}
@@ -132,7 +132,7 @@ class LAGR_Pin_Composer extends LAGR_Image_Composer {
 		self::apply_corner_radius( $canvas, $preset );
 
 		$saved = self::save( $canvas, $preset, $out_path );
-		imagedestroy( $canvas );
+		self::destroy_image( $canvas );
 
 		if ( ! $saved['ok'] ) {
 			return self::result( false, '', '', $saved['error'] );
@@ -282,7 +282,7 @@ class LAGR_Pin_Composer extends LAGR_Image_Composer {
 				$source = @imagecreatefromstring( (string) file_get_contents( $path ) ); // phpcs:ignore
 				if ( $source ) {
 					self::draw_source( $canvas, $source, $preset );
-					imagedestroy( $source );
+					self::destroy_image( $source );
 					self::apply_filters( $canvas, $preset );
 				}
 			}
@@ -484,11 +484,11 @@ class LAGR_Pin_Composer extends LAGR_Image_Composer {
 		imagesavealpha( $small, true );
 		imagefilledrectangle( $small, 0, 0, $size - 1, $size - 1, imagecolorallocatealpha( $small, 0, 0, 0, self::GD_TRANSPARENT ) );
 		imagecopyresampled( $small, $layer, 0, 0, 0, 0, $size, $size, $big, $big );
-		imagedestroy( $layer );
+		self::destroy_image( $layer );
 
 		imagealphablending( $canvas, true );
 		imagecopy( $canvas, $small, (int) $x, (int) $y, 0, 0, $size, $size );
-		imagedestroy( $small );
+		self::destroy_image( $small );
 	}
 
 	// ----------------------------------------------------------- languages
@@ -623,7 +623,7 @@ class LAGR_Pin_Composer extends LAGR_Image_Composer {
 
 		imagealphablending( $canvas, true );
 		imagecopy( $canvas, $layer, (int) $x, (int) $y, 0, 0, $w, $h );
-		imagedestroy( $layer );
+		self::destroy_image( $layer );
 	}
 
 	// -------------------------------------------------------------- footer

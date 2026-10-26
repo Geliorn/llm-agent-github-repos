@@ -33,6 +33,16 @@ class LAGR_Image_Composer {
 		return self::available() && function_exists( 'imagettftext' );
 	}
 
+	/**
+	 * Free a GD image. Needed on PHP 7.4 (resources); since PHP 8.0 GdImage is
+	 * freed when unreferenced and imagedestroy() is a no-op, deprecated in 8.5.
+	 */
+	protected static function destroy_image( $image ) {
+		if ( PHP_VERSION_ID < 80000 ) {
+			imagedestroy( $image );
+		}
+	}
+
 	// --------------------------------------------------------------- canvas
 
 	protected static function new_canvas( $width, $height, $background ) {
@@ -243,7 +253,7 @@ class LAGR_Image_Composer {
 				imagecopyresampled( $layer, $mask, 0, 0, 0, 0, $w, $h, $mw, $mh );
 		}
 
-		imagedestroy( $mask );
+		self::destroy_image( $mask );
 
 		$alpha = (int) $preset['mask_alpha'];
 		if ( $alpha < 100 ) {
@@ -254,7 +264,7 @@ class LAGR_Image_Composer {
 
 		imagealphablending( $canvas, true );
 		imagecopy( $canvas, $layer, 0, 0, 0, 0, $w, $h );
-		imagedestroy( $layer );
+		self::destroy_image( $layer );
 	}
 
 	/** Multiplies every pixel's opacity by $factor (0..1), keeping its own alpha shape. */
@@ -311,7 +321,7 @@ class LAGR_Image_Composer {
 		imagesavealpha( $layer, true );
 		imagefilledrectangle( $layer, 0, 0, $target_w - 1, $target_h - 1, imagecolorallocatealpha( $layer, 0, 0, 0, self::GD_TRANSPARENT ) );
 		imagecopyresampled( $layer, $logo, 0, 0, 0, 0, $target_w, $target_h, $lw, $lh );
-		imagedestroy( $logo );
+		self::destroy_image( $logo );
 
 		$alpha = (int) $preset['logo_alpha'];
 		if ( $alpha < 100 ) {
@@ -322,7 +332,7 @@ class LAGR_Image_Composer {
 
 		imagealphablending( $canvas, true );
 		imagecopy( $canvas, $layer, $x, $y, 0, 0, $target_w, $target_h );
-		imagedestroy( $layer );
+		self::destroy_image( $layer );
 	}
 
 	// ----------------------------------------------------------------- text
@@ -591,7 +601,7 @@ class LAGR_Image_Composer {
 
 		imagealphablending( $canvas, true );
 		imagecopy( $canvas, $layer, $x1, $y1, 0, 0, $w, $h );
-		imagedestroy( $layer );
+		self::destroy_image( $layer );
 	}
 
 	protected static function save( $canvas, array $preset, $out_path ) {
@@ -623,7 +633,7 @@ class LAGR_Image_Composer {
 				imagealphablending( $flat, true );
 				imagecopy( $flat, $canvas, 0, 0, 0, 0, imagesx( $canvas ), imagesy( $canvas ) );
 				$ok = imagejpeg( $flat, $out_path, (int) $preset['quality'] );
-				imagedestroy( $flat );
+				self::destroy_image( $flat );
 				$mime = 'image/jpeg';
 		}
 
